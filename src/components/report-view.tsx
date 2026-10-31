@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, Check, ChevronDown, CircleAlert, Link as LinkIcon, RotateCcw, X } from "lucide-react";
 import type { Report } from "@/lib/analyses";
 import { UrlForm } from "@/components/url-form";
-import { TrackForm } from "@/components/track-form";
+import { TrackCta, type Viewer } from "@/components/track-cta";
 import { cn } from "@/lib/utils";
 
 type Result = NonNullable<Report["result"]>;
@@ -26,7 +26,7 @@ function scoreTone(score: number) {
   return { stroke: "stroke-orange-600", bar: "bg-orange-600", chip: "bg-orange-50 text-orange-800", label: "Low visibility", verb: "rarely recommend" };
 }
 
-export function ReportView({ id, turnstileSiteKey, trackingLive }: { id: string; turnstileSiteKey: string | null; trackingLive: boolean }) {
+export function ReportView({ id, turnstileSiteKey, viewer }: { id: string; turnstileSiteKey: string | null; viewer: Viewer }) {
   const [report, setReport] = useState<Report | null>(null);
   const [notFound, setNotFound] = useState(false);
 
@@ -66,7 +66,7 @@ export function ReportView({ id, turnstileSiteKey, trackingLive }: { id: string;
     );
   }
   if (!report.result) return <Running report={report} />;
-  return <Completed report={report} result={report.result} trackingLive={trackingLive} />;
+  return <Completed report={report} result={report.result} viewer={viewer} />;
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -178,7 +178,7 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
-function Completed({ report, result, trackingLive }: { report: Report; result: Result; trackingLive: boolean }) {
+function Completed({ report, result, viewer }: { report: Report; result: Result; viewer: Viewer }) {
   const tone = scoreTone(result.geoScore);
   const t = result.breakdown.totals;
   const brand = report.profile?.brand ?? report.domain;
@@ -382,7 +382,7 @@ function Completed({ report, result, trackingLive }: { report: Report; result: R
           </div>
         </Card>
 
-        <TrackForm analysisId={report.id} brand={brand} questions={result.queries.length} live={trackingLive} />
+        <TrackCta analysisId={report.id} brand={brand} viewer={viewer} />
 
         <Questions result={result} providerNames={providerNames} />
 

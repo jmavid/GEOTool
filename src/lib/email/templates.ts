@@ -21,21 +21,6 @@ function button(href: string, label: string): string {
   return `<a href="${escapeHtml(href)}" style="display:inline-block;padding:12px 20px;border-radius:10px;background:#2b4eff;color:#ffffff;font-weight:600;font-size:15px;text-decoration:none">${escapeHtml(label)}</a>`;
 }
 
-export function confirmationEmail(p: { to: string; domain: string; confirmUrl: string; questions: number }): OutgoingEmail {
-  const domain = escapeHtml(p.domain);
-  return {
-    to: p.to,
-    subject: `Confirm weekly GEO Score tracking for ${p.domain}`,
-    html: layout(
-      `<h1 style="margin:0 0 12px;font-size:22px;line-height:1.25">Confirm weekly tracking for ${domain}</h1>
-<p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#4a5060">Every Monday we'll ask AI models the same ${p.questions} buyer questions and email you the new score, so you can see if your fixes work.</p>
-${button(p.confirmUrl, "Confirm weekly tracking")}`,
-      "You got this because someone entered this address on GEO Score. If it wasn't you, ignore this email: nothing will be sent without confirming.",
-    ),
-    text: `Confirm weekly GEO Score tracking for ${p.domain}:\n${p.confirmUrl}\n\nIf it wasn't you, ignore this email: nothing will be sent without confirming.`,
-  };
-}
-
 export interface WeeklyEmailData {
   to: string;
   brand: string;
@@ -87,5 +72,19 @@ ${button(d.reportUrl, "See the full report")}`,
     ]
       .filter(Boolean)
       .join("\n"),
+  };
+}
+
+export function loginEmail(p: { to: string; loginUrl: string; minutes: number }): OutgoingEmail {
+  return {
+    to: p.to,
+    subject: "Your GEO Score sign-in link",
+    html: layout(
+      `<h1 style="margin:0 0 12px;font-size:22px;line-height:1.25">Sign in to GEO Score</h1>
+<p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#4a5060">Click the button to sign in. The link works once and expires in ${p.minutes} minutes.</p>
+${button(p.loginUrl, "Sign in")}`,
+      "If you didn't ask to sign in, ignore this email: nobody can get in without this link.",
+    ),
+    text: `Sign in to GEO Score (the link works once and expires in ${p.minutes} minutes):\n${p.loginUrl}\n\nIf you didn't ask to sign in, ignore this email.`,
   };
 }

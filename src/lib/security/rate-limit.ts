@@ -10,3 +10,7 @@ export function burstLimited(key: string, now = Date.now()): boolean {
   if (hits.size > 10_000) hits.clear();
   return recent.length > MAX_PER_WINDOW;
 }
+
+export function clientIp(req: Request): string {
+  return req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+}

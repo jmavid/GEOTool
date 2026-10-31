@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { MIN_GAP_MS, pickWebsitesToRefresh } from "@/lib/tracking";
-import { confirmationEmail, escapeHtml, scoreChange, weeklyEmail, type WeeklyEmailData } from "@/lib/email/templates";
+import { MIN_GAP_MS, pickWebsitesToRefresh, trackingPlanFor } from "@/lib/tracking";
+import { escapeHtml, scoreChange, weeklyEmail, type WeeklyEmailData } from "@/lib/email/templates";
 import { parseSender } from "@/lib/email/send";
 
 const NOW = Date.UTC(2026, 10, 2, 7);
@@ -42,6 +42,14 @@ describe("pickWebsitesToRefresh", () => {
   });
 });
 
+describe("trackingPlanFor", () => {
+  it("runs a shared site on the biggest plan that follows it", () => {
+    expect(trackingPlanFor(["STARTER"])).toBe("STARTER");
+    expect(trackingPlanFor(["STARTER", "PRO"])).toBe("PRO");
+    expect(trackingPlanFor([])).toBe("STARTER");
+  });
+});
+
 describe("tracking emails", () => {
   const base: WeeklyEmailData = {
     to: "ana@example.com",
@@ -80,12 +88,6 @@ describe("tracking emails", () => {
     expect(mail.html).toContain("&lt;script&gt;alert(1)&lt;/script&gt; &amp; co");
   });
 
-  it("asks for confirmation before any weekly email", () => {
-    const mail = confirmationEmail({ to: "ana@example.com", domain: "acme.com", confirmUrl: "https://geo.test/subscription/t?action=confirm", questions: 25 });
-    expect(mail.subject).toContain("Confirm");
-    expect(mail.text).toContain("https://geo.test/subscription/t?action=confirm");
-    expect(mail.html).toContain("25 buyer questions");
-  });
 });
 
 describe("parseSender", () => {

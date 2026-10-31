@@ -22,9 +22,45 @@ const createdAt = () =>
 export const users = sqliteTable("users", {
   id: id(),
   email: text("email").notNull().unique(),
+  /** Effective plan. Only the Stripe webhook moves it off FREE (see lib/billing.ts). */
   plan: text("plan", { enum: PLANS }).notNull().default("FREE"),
+  stripeCustomerId: text("stripe_customer_id").unique(),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  /** Stripe subscription status (active, past_due, canceled...), shown on the account page. */
+  subscriptionStatus: text("subscription_status"),
+  currentPeriodEnd: integer("current_period_end", { mode: "timestamp_ms" }),
+  /** Agency plan: name printed on client reports. */
+  agencyName: text("agency_name"),
   createdAt: createdAt(),
 });
+
+/** Signed-in browsers. The cookie holds a random token; only its SHA-256 is stored, so a DB leak can't log anyone in. */
+export const sessions = sqliteTable(
+  "sessions",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("sessions_user_idx").on(t.userId)],
+);
+
+/** Magic-link sign-in tokens: hashed, single use, short-lived. The user row is only created once a link is used. */
+export const loginTokens = sqliteTable(
+  "login_tokens",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull(),
+    ipHash: text("ip_hash"),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    usedAt: integer("used_at", { mode: "timestamp_ms" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("login_tokens_email_idx").on(t.email, t.createdAt), index("login_tokens_ip_idx").on(t.ipHash, t.createdAt)],
+);
 
 export const projects = sqliteTable("projects", {
   id: id(),
@@ -34,6 +70,22 @@ export const projects = sqliteTable("projects", {
   name: text("name").notNull(),
   createdAt: createdAt(),
 });
+
+/** Websites a project follows. Websites are shared (one row per URL), so several accounts can track the same site. */
+export const projectWebsites = sqliteTable(
+  "project_websites",
+  {
+    id: id(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    websiteId: text("website_id")
+      .notNull()
+      .references(() => websites.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("project_websites_project_website_idx").on(t.projectId, t.websiteId), index("project_websites_website_idx").on(t.websiteId)],
+);
 
 /** One row per canonical URL. Analyses hang from it, so score history is per website. */
 export const websites = sqliteTable(
@@ -62,6 +114,8 @@ export const analyses = sqliteTable(
     plan: text("plan", { enum: PLANS }).notNull().default("FREE"),
     trigger: text("trigger", { enum: ANALYSIS_TRIGGERS }).notNull().default("USER"),
     ipHash: text("ip_hash"),
+    /** Signed-in user who asked for it; counts against their plan's monthly analyses. */
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
     /** Analysis whose buyer questions were reused, so scores of the same website stay comparable. */
     promptsFromAnalysisId: text("prompts_from_analysis_id"),
     /** Brand profile extracted from the site (brand, industry, competitors...). */
@@ -80,7 +134,7 @@ export const analyses = sqliteTable(
     createdAt: createdAt(),
     completedAt: integer("completed_at", { mode: "timestamp_ms" }),
   },
-  (t) => [index("analyses_website_idx").on(t.websiteId, t.createdAt), index("analyses_ip_idx").on(t.ipHash, t.createdAt)],
+  (t) => [index("analyses_website_idx").on(t.websiteId, t.createdAt), index("analyses_ip_idx").on(t.ipHash, t.createdAt), index("analyses_user_idx").on(t.userId, t.createdAt)],
 );
 
 export const prompts = sqliteTable(

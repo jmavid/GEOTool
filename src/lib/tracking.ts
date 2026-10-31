@@ -4,12 +4,11 @@ import type { GeoScore } from "@/lib/pipeline/score";
 import type { BrandProfile } from "@/lib/pipeline/profile";
 import { promptsFor } from "@/lib/plans";
 import { emailConfigured, sendEmail } from "@/lib/email/send";
-import { confirmationEmail, weeklyEmail } from "@/lib/email/templates";
-import { enqueue, hashIp } from "@/lib/analyses";
-import { UserError } from "@/lib/errors";
+import { weeklyEmail } from "@/lib/email/templates";
+import { enqueue } from "@/lib/analyses";
+import { paidTrackedSites } from "@/lib/projects";
+import type { Plan } from "@/db/schema";
 
-/** Plan of scheduled runs: same prompt budget as the STARTER plan that sells weekly tracking. */
-const TRACKING_PLAN = "STARTER" as const;
 /** A site analyzed less than this long ago is not re-run (its user may have just checked it by hand). */
 export const MIN_GAP_MS = 6 * 24 * 3_600_000;
 
@@ -36,20 +35,29 @@ export function pickWebsitesToRefresh(latest: LatestRun[], now: number, max: num
     .map((r) => r.websiteId);
 }
 
-/** Cron entry (Mondays): queues one analysis per website with at least one confirmed subscriber. */
+/** Pure: the run for a site follows the biggest plan among its paying owners (more questions). */
+export function trackingPlanFor(plans: Plan[]): Plan {
+  return plans.reduce<Plan>((best, p) => (promptsFor(p) > promptsFor(best) ? p : best), "STARTER");
+}
+
+/**
+ * Cron entry (Mondays): one analysis per website that a paying account follows. Owners get a confirmed
+ * subscription the first time (their address is verified by the sign-in link); one they unsubscribed stays off.
+ */
 export async function scheduleWeeklyAnalyses(): Promise<{ queued: number; tracked: number }> {
   if (!emailConfigured()) {
     console.warn("[tracking] email is not configured: weekly runs skipped");
     return { queued: 0, tracked: 0 };
   }
   const db = getDb();
-  const active = await db
-    .selectDistinct({ websiteId: schema.subscriptions.websiteId })
-    .from(schema.subscriptions)
-    .where(and(isNotNull(schema.subscriptions.confirmedAt), isNull(schema.subscriptions.unsubscribedAt)));
+  const owners = await paidTrackedSites();
+  const websiteIds = [...new Set(owners.map((o) => o.websiteId))];
+  for (const o of owners) {
+    await db.insert(schema.subscriptions).values({ email: o.email, websiteId: o.websiteId, confirmedAt: new Date() }).onConflictDoNothing();
+  }
 
   const latest: LatestRun[] = await Promise.all(
-    active.map(async ({ websiteId }) => {
+    websiteIds.map(async (websiteId) => {
       const last = await db.query.analyses.findFirst({
         columns: { status: true, createdAt: true },
         where: eq(schema.analyses.websiteId, websiteId),
@@ -61,53 +69,12 @@ export async function scheduleWeeklyAnalyses(): Promise<{ queued: number; tracke
 
   const picked = pickWebsitesToRefresh(latest, Date.now(), Number(process.env.MAX_WEEKLY_ANALYSES ?? 50));
   for (const websiteId of picked) {
-    const [created] = await db
-      .insert(schema.analyses)
-      .values({ websiteId, plan: TRACKING_PLAN, trigger: "SCHEDULED" })
-      .returning({ id: schema.analyses.id });
+    const plan = trackingPlanFor(owners.filter((o) => o.websiteId === websiteId).map((o) => o.plan));
+    const [created] = await db.insert(schema.analyses).values({ websiteId, plan, trigger: "SCHEDULED" }).returning({ id: schema.analyses.id });
     await enqueue(created.id);
   }
   if (picked.length < latest.length) console.info(`[tracking] ${latest.length - picked.length} tracked sites skipped (recent run or cap)`);
-  return { queued: picked.length, tracked: active.length };
-}
-
-/**
- * "Track my score weekly" sign-up for the analysis' website.
- * - waitlist: email sending isn't set up yet; the address is kept as a demand signal.
- * - pending: a confirmation email was sent (new or re-activated sign-up).
- * - confirmed: already tracking; nothing is sent, so the form can't be used to spam an address.
- */
-export async function subscribe(analysisId: string, email: string, ip: string): Promise<"waitlist" | "pending" | "confirmed"> {
-  const db = getDb();
-  const analysis = await db.query.analyses.findFirst({ columns: { id: true, websiteId: true }, where: eq(schema.analyses.id, analysisId) });
-  if (!analysis) throw new UserError("This report doesn't exist.");
-  const normalized = email.toLowerCase();
-  const where = and(eq(schema.subscriptions.email, normalized), eq(schema.subscriptions.websiteId, analysis.websiteId));
-
-  const existing = await db.query.subscriptions.findFirst({ where });
-  if (existing?.confirmedAt && !existing.unsubscribedAt) return "confirmed";
-  const live = emailConfigured();
-  if (existing && !existing.unsubscribedAt) {
-    // Still waiting for confirmation: one email per sign-up, re-sending only after a day.
-    if (!live) return "waitlist";
-    if (existing.createdAt.getTime() > Date.now() - 24 * 3_600_000) return "pending";
-  }
-
-  const [sub] = existing
-    ? await db
-        .update(schema.subscriptions)
-        .set({ confirmedAt: null, unsubscribedAt: null, createdAt: new Date(), token: existing.token ?? crypto.randomUUID() })
-        .where(eq(schema.subscriptions.id, existing.id))
-        .returning()
-    : await db.insert(schema.subscriptions).values({ email: normalized, websiteId: analysis.websiteId, analysisId, ipHash: hashIp(ip) }).returning();
-  if (!live) return "waitlist";
-
-  const website = await db.query.websites.findFirst({ columns: { domain: true }, where: eq(schema.websites.id, analysis.websiteId) });
-  const sent = await sendEmail(
-    confirmationEmail({ to: normalized, domain: website?.domain ?? "your site", confirmUrl: manageUrl(sub.token!, "confirm"), questions: promptsFor(TRACKING_PLAN) }),
-  );
-  if (!sent) throw new UserError("We couldn't send the confirmation email. Please try again later.");
-  return "pending";
+  return { queued: picked.length, tracked: websiteIds.length };
 }
 
 export type SubscriptionAction = "confirm" | "unsubscribe";
@@ -157,11 +124,14 @@ export async function notifySubscribers(analysisId: string): Promise<number> {
     }),
   ]);
   if (!website) return 0;
+  // Only accounts that still pay for tracking (and follow this site) get the email.
+  const paying = new Set((await paidTrackedSites()).filter((o) => o.websiteId === analysis.websiteId).map((o) => o.email));
+  const recipients = subs.filter((sub) => paying.has(sub.email));
 
   const profile = analysis.profile as BrandProfile | null;
   const totals = (analysis.scoreBreakdown as GeoScore | null)?.totals;
   const sent: string[] = [];
-  for (const sub of subs) {
+  for (const sub of recipients) {
     if (!sub.token) continue;
     const ok = await sendEmail(
       weeklyEmail({

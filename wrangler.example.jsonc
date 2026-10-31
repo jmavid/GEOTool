@@ -46,8 +46,12 @@
     // Sender for tracking emails, e.g. "GEO Score <scores@yourdomain.com>" (a domain onboarded in Email Service).
     "EMAIL_FROM": "",
     // Cap on scheduled re-runs per week (Workers AI budget guard, separate from MAX_ANALYSES_PER_DAY).
-    "MAX_WEEKLY_ANALYSES": "50"
+    "MAX_WEEKLY_ANALYSES": "50",
+    // Stripe Price ids (price_...) of the monthly plans. Billing switches on when these AND the Stripe secrets are set.
+    "STRIPE_PRICE_STARTER": "",
+    "STRIPE_PRICE_PRO": "",
+    "STRIPE_PRICE_AGENCY": ""
   }
-  // Secrets (wrangler secret put): INTERNAL_SECRET, IP_HASH_SALT, TURNSTILE_SECRET_KEY
+  // Secrets (wrangler secret put): INTERNAL_SECRET, IP_HASH_SALT, TURNSTILE_SECRET_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
   // Only for EXTERNAL_PROVIDERS: OPENAI_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY, PERPLEXITY_API_KEY
 }

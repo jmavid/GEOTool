@@ -120,25 +120,47 @@ Rough estimate with the default Workers AI setup (25 prompts × 2 models + 50 ve
 **≈ $0.05–0.15 per analysis** (gpt-oss-120b $0.35/$0.75 per 1M tokens, DeepSeek V4.1 Flash $0.30/$1.20; reasoning
 tokens count as output). Workers AI includes 10,000 free neurons/day. Real numbers: `analyses.cost_breakdown`.
 
+## Accounts
+
+Magic-link sign-in, no passwords (`src/lib/auth/session.ts`). `/login` emails a single-use link (15 min, stored hashed,
+max 3 per address and 10 per IP per hour). The link opens `/auth/verify/[token]`, which only spends the token on a
+button press (POST), so mail scanners can't burn it. The user row is created on first sign-in. Sessions: random
+cookie token (httpOnly, SameSite=Lax, 30 days), only its SHA-256 in `sessions`. Mutating routes also check the Origin.
+
+Signed-in users get `/dashboard` (projects → websites, score history, run now, remove) and `/account`. Anonymous
+visitors keep the free check from the home page.
+
+## Plans and billing
+
+Limits live in `src/lib/plans.ts`, enforced in `createAnalysis` for signed-in users (websites across projects,
+analyses per rolling 30 days, questions per analysis). Anonymous checks: per-IP daily limit + global daily cap.
+
+| Plan | €/month | Websites | Questions | Analyses / 30 days | Weekly tracking | Client projects + reports |
+|---|---|---|---|---|---|---|
+| Free | 0 | 1 | 25 | 3 | – | – |
+| Starter | 19 | 1 | 25 | 5 | ✓ | – |
+| Pro | 49 | 5 | 100 | 30 | ✓ | – |
+| Agency | 149 | 30 | 100 | 150 | ✓ | ✓ |
+
+Stripe (`src/lib/billing.ts`): `/pricing` → Checkout (monthly subscription) → webhook `/api/billing/webhook`
+(signature-checked) sets `users.plan` from the subscription's price; `past_due` keeps the plan while Stripe retries,
+anything else drops to Free. Plan changes, card, invoices and cancelling go through the Stripe customer portal.
+Billing switches on once `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and the three `STRIPE_PRICE_*` are set.
+
+Agency: one project per client, and `/projects/[id]/report`, a printable client report (save as PDF) with the agency
+name from `/account`.
+
 ## Weekly tracking
 
-"Track your score weekly" on the report → `subscriptions` row + a **double opt-in** email (`/subscription/[token]`,
-confirm/unsubscribe are form POSTs so mail link scanners can't trigger them). Only confirmed, not unsubscribed rows count,
-so nobody can make us re-analyze a site or email a stranger by typing an address.
+Paid plans: every website in a paying account's projects is re-checked weekly. A Cron Trigger (Mondays 07:00 UTC,
+`worker.js scheduled()` → `/api/internal/weekly`) queues one `SCHEDULED` analysis per such website not analyzed in the
+last 6 days (cap `MAX_WEEKLY_ANALYSES`, separate from the visitors' daily cap), on the biggest plan that follows it.
+Runs reuse the website's questions, so scores are comparable. Owners get a confirmed `subscriptions` row (their address
+is verified by sign-in) and, after each run, an email with the new score, the change and Fix #1 (`List-Unsubscribe`
+one-click; `/subscription/[token]` to stop or resume). Never twice per analysis; only accounts still paying.
 
-A Cron Trigger (Mondays 07:00 UTC, `worker.js scheduled()` → `/api/internal/weekly`) queues one `SCHEDULED` analysis per
-tracked website not analyzed in the last 6 days (cap `MAX_WEEKLY_ANALYSES`, separate from the visitors' daily cap). Runs
-reuse the website's questions, so scores are comparable. When a scheduled run completes, each confirmed subscriber gets
-the new score, the change since last time and Fix #1 (`List-Unsubscribe` one-click supported); never twice per analysis.
-
-Emails use **Cloudflare Email Service** (nothing leaves Cloudflare). Until it is set up, sign-ups are kept as a waitlist
-and no weekly run is queued. In `next dev` emails are printed to the console, so the whole flow works locally.
-
-## Plans
-
-Defined in `src/lib/plans.ts` (FREE 1 analysis/25 prompts · STARTER €19 1 site/25 prompts/weekly ·
-PRO €49 5 sites/100 prompts · AGENCY €149 30 sites/reports). No auth/Stripe yet: anonymous runs are FREE.
-Billing = set `users.plan`.
+Emails use **Cloudflare Email Service** (nothing leaves Cloudflare). Until it is set up, sign-in is closed and no
+weekly run is queued. In `next dev` emails are printed to the console, so the whole flow works locally.
 
 ## Run locally
 
@@ -164,9 +186,15 @@ npm run db:migrate:remote
 npx wrangler secret put INTERNAL_SECRET
 npx wrangler secret put IP_HASH_SALT
 npx wrangler secret put TURNSTILE_SECRET_KEY   # + TURNSTILE_SITE_KEY in wrangler.jsonc vars
+npx wrangler secret put STRIPE_SECRET_KEY
+npx wrangler secret put STRIPE_WEBHOOK_SECRET  # webhook endpoint: https://<your-app>/api/billing/webhook
 npm run deploy
 ```
-Weekly tracking emails: onboard a sending domain in Cloudflare Email Service, then in `wrangler.jsonc` add
+Stripe: create a product with three monthly prices and put their ids in `STRIPE_PRICE_STARTER/PRO/AGENCY`; the webhook
+needs the events `checkout.session.completed` and `customer.subscription.created/updated/deleted`. Enable the customer
+portal (plan switching between the three prices). Locally: `stripe listen --forward-to localhost:3000/api/billing/webhook`.
+
+Sign-in and weekly tracking emails: onboard a sending domain in Cloudflare Email Service, then in `wrangler.jsonc` add
 `"send_email": [{ "name": "EMAIL" }]`, set `EMAIL_FROM` (e.g. `GEO Score <scores@yourdomain.com>`) and `APP_URL`, and
 `npm run db:migrate:remote` + `npm run deploy`.
 Queues and the CPU time of a 2-3 min
@@ -176,8 +204,9 @@ analysis need the Workers Paid plan.
 
 Done: phases 1-12 (landing, analyzer, profile, queries, OpenAI provider, response analysis, score, results,
 competitors, recommendations, persistence/history, tests, Cloudflare deploy setup).
-Weekly tracking: done (needs the Email Service setup above to send in production).
-Next: tune prompts/weights on real analyses · auth + projects UI · plan limits · Stripe.
+Done: weekly tracking, sentiment, magic-link accounts, dashboard/projects, plan limits, Stripe subscriptions, agency
+client reports. Production needs the Email Service and Stripe setup above.
+Next: tune prompts/weights on real analyses.
 
 ## License
 

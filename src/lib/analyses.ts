@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { after } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { and, asc, count, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import type { SiteFacts } from "@/lib/analyzer/site";
 import type { BrandProfile } from "@/lib/pipeline/profile";
@@ -10,6 +10,9 @@ import type { Evidence } from "@/lib/pipeline/insights";
 import { runAnalysis } from "@/lib/pipeline/run";
 import { canonicalWebsiteUrl, validatePublicUrl } from "@/lib/security/url";
 import { UserError } from "@/lib/errors";
+import type { User } from "@/lib/auth/session";
+import { planLimitError, promptsFor } from "@/lib/plans";
+import { analysesLast30Days, attachWebsite, defaultProjectId, ownedProject, trackedWebsiteIds } from "@/lib/projects";
 import { EXTERNAL_PROVIDERS } from "@/providers";
 
 const DEDUPE_WINDOW_MS = 24 * 3_600_000;
@@ -25,17 +28,39 @@ export function hashIp(ip: string): string {
 /**
  * Creates (or reuses) an analysis for a URL. Reuse within 24h is the main cost control:
  * the same site analyzed twice in a day costs nothing the second time.
+ *
+ * Anonymous visitors get the free check, limited per IP and by a global daily cap. Signed-in users run on their
+ * plan: the site joins their dashboard (within the plan's website limit) and counts against its monthly analyses.
  */
-export async function createAnalysis(rawUrl: string, ip: string): Promise<{ id: string; reused: boolean }> {
+export async function createAnalysis(rawUrl: string, ip: string, user: User | null = null, projectId?: string): Promise<{ id: string; reused: boolean }> {
   const url = validatePublicUrl(rawUrl);
   const canonical = canonicalWebsiteUrl(url);
   const db = getDb();
+  const plan = user?.plan ?? "FREE";
 
   await db
     .insert(schema.websites)
     .values({ url: canonical, domain: url.hostname.replace(/^www\./, "") })
     .onConflictDoNothing();
   const website = (await db.query.websites.findFirst({ where: eq(schema.websites.url, canonical) }))!;
+
+  let project: string | null = null;
+  if (user) {
+    const tracked = await trackedWebsiteIds(user.id);
+    const alreadyTracked = tracked.includes(website.id);
+    // A site already in the dashboard stays where it is unless a project is named.
+    if (projectId) {
+      project = (await ownedProject(user.id, projectId))?.id ?? null;
+      if (!project) throw new UserError("That project doesn't exist.");
+    } else if (!alreadyTracked) project = await defaultProjectId(user.id);
+    const error = planLimitError(plan, {
+      trackedSites: tracked.length,
+      alreadyTracked,
+      // Only the website limit applies to a reused analysis, so its count is checked below.
+      analysesLast30Days: 0,
+    });
+    if (error) throw new UserError(error);
+  }
 
   const recent = await db.query.analyses.findFirst({
     where: and(
@@ -45,26 +70,36 @@ export async function createAnalysis(rawUrl: string, ip: string): Promise<{ id: 
     ),
     orderBy: desc(schema.analyses.createdAt),
   });
-  if (recent) return { id: recent.id, reused: true };
+  // A smaller run (fewer questions than this plan asks) is not a substitute.
+  if (recent && promptsFor(recent.plan) >= promptsFor(plan)) {
+    if (project) await attachWebsite(project, website.id);
+    return { id: recent.id, reused: true };
+  }
 
   const ipHash = hashIp(ip);
-  const limit = Number(process.env.FREE_ANALYSES_PER_IP_PER_DAY ?? 3);
-  const today = await db.query.analyses.findMany({
-    columns: { id: true },
-    where: and(eq(schema.analyses.ipHash, ipHash), gte(schema.analyses.createdAt, new Date(Date.now() - 24 * 3_600_000))),
-  });
-  if (today.length >= limit) throw new UserError("You've reached the free analysis limit for today. Try again tomorrow.");
+  if (user) {
+    const error = planLimitError(plan, { trackedSites: 0, alreadyTracked: true, analysesLast30Days: await analysesLast30Days(user.id) });
+    if (error) throw new UserError(error);
+  } else {
+    const limit = Number(process.env.FREE_ANALYSES_PER_IP_PER_DAY ?? 3);
+    const today = await db.query.analyses.findMany({
+      columns: { id: true },
+      where: and(eq(schema.analyses.ipHash, ipHash), gte(schema.analyses.createdAt, new Date(Date.now() - 24 * 3_600_000))),
+    });
+    if (today.length >= limit) throw new UserError("You've reached the free analysis limit for today. Try again tomorrow.");
 
-  // Global budget guard: caps Workers AI spend even if many IPs are used. Weekly tracking runs have their own cap
-  // (MAX_WEEKLY_ANALYSES), so a Monday batch never locks visitors out.
-  const globalLimit = Number(process.env.MAX_ANALYSES_PER_DAY ?? 100);
-  const [{ n }] = await db
-    .select({ n: count() })
-    .from(schema.analyses)
-    .where(and(eq(schema.analyses.trigger, "USER"), gte(schema.analyses.createdAt, new Date(Date.now() - 24 * 3_600_000))));
-  if (n >= globalLimit) throw new UserError("We're at capacity for today. Please try again tomorrow.");
+    // Global budget guard for anonymous checks: caps Workers AI spend even if many IPs are used. Accounts are bounded
+    // by their plan and weekly tracking runs by MAX_WEEKLY_ANALYSES, so neither is locked out by a busy day.
+    const globalLimit = Number(process.env.MAX_ANALYSES_PER_DAY ?? 100);
+    const [{ n }] = await db
+      .select({ n: count() })
+      .from(schema.analyses)
+      .where(and(eq(schema.analyses.trigger, "USER"), isNull(schema.analyses.userId), gte(schema.analyses.createdAt, new Date(Date.now() - 24 * 3_600_000))));
+    if (n >= globalLimit) throw new UserError("We're at capacity for today. Please try again tomorrow.");
+  }
 
-  const [created] = await db.insert(schema.analyses).values({ websiteId: website.id, ipHash, plan: "FREE" }).returning({ id: schema.analyses.id });
+  const [created] = await db.insert(schema.analyses).values({ websiteId: website.id, ipHash, plan, userId: user?.id ?? null }).returning({ id: schema.analyses.id });
+  if (project) await attachWebsite(project, website.id);
   await enqueue(created.id);
   return { id: created.id, reused: false };
 }

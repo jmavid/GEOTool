@@ -32,7 +32,7 @@ export default async function Home() {
       "A weighted mix of how often you are mentioned, how often you are recommended, your average position in lists, the citations to your site, and your share of voice against competitors. The report shows each part and its weight.",
     ],
     ["Why does my score change between runs?", "AI answers vary. We reuse the same questions for your site each time, so the trend is comparable even when single answers move."],
-    ["Is it really free?", "Yes: a full analysis with no account. Weekly tracking is coming; leave your email on the report to hear when it's ready."],
+    ["Is it really free?", "The check is: a full analysis with no account. Paid plans add weekly re-checks with an email every Monday, more questions per analysis, more websites, and client reports for agencies."],
   ];
 
   return (
