@@ -140,6 +140,8 @@ export async function getReport(id: string) {
             brandMentioned: r.brandMentioned,
             recommended: r.recommended,
             position: r.position,
+            sentiment: r.sentiment as "positive" | "neutral" | "negative" | null,
+            context: r.context,
             competitors: r.competitorsMentioned,
             citations: r.citations.slice(0, 8),
             response: r.response,

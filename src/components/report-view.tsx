@@ -258,6 +258,7 @@ function Completed({ report, result, trackingLive }: { report: Report; result: R
             {[
               ["#breakdown", "Score breakdown"],
               ["#models", "Models"],
+              ["#sentiment", "Sentiment"],
               ["#competitors", "Competitors"],
               ["#plan", "Action plan"],
               ["#questions", "Questions"],
@@ -319,6 +320,8 @@ function Completed({ report, result, trackingLive }: { report: Report; result: R
             </p>
           )}
         </Card>
+
+        <Sentiment result={result} brand={brand} providerNames={providerNames} />
 
         <Card id="competitors" title="Who the AIs recommend instead" subtitle="Share of voice: how often each brand appears across all answers.">
           <div className="space-y-3">
@@ -388,6 +391,64 @@ function Completed({ report, result, trackingLive }: { report: Report; result: R
         </p>
       </div>
     </div>
+  );
+}
+
+const SENTIMENT_TONES = [
+  { key: "positive", label: "Positive", bar: "bg-blue-600", text: "text-blue-700" },
+  { key: "neutral", label: "Neutral", bar: "bg-foreground/30", text: "text-muted-foreground" },
+  { key: "negative", label: "Negative", bar: "bg-orange-600", text: "text-orange-800" },
+] as const;
+
+/** How the models talk about the brand when they do mention it. */
+function Sentiment({ result, brand, providerNames }: { result: Result; brand: string; providerNames: Record<string, string> }) {
+  const mentions = result.queries.flatMap((q) => q.results.filter((r) => r.brandMentioned).map((r) => ({ ...r, prompt: q.text })));
+  const rated = mentions.filter((r) => r.sentiment);
+  const count = (key: string) => rated.filter((r) => r.sentiment === key).length;
+  // Show the negative quotes first: they are the ones worth acting on.
+  const quotes = [...rated]
+    .filter((r) => r.context)
+    .sort((a, b) => SENTIMENT_TONES.findIndex((t) => t.key === b.sentiment) - SENTIMENT_TONES.findIndex((t) => t.key === a.sentiment))
+    .slice(0, 4);
+
+  return (
+    <Card id="sentiment" title={`How the AIs describe ${brand}`} subtitle="Tone of the answers that mention you.">
+      {rated.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {mentions.length === 0 ? "No answer mentioned you, so there is no tone to measure yet." : "The answers that mention you didn't carry a clear tone."}
+        </p>
+      ) : (
+        <>
+          <div className="flex h-3 overflow-hidden rounded-full bg-muted" role="img" aria-label={SENTIMENT_TONES.map((t) => `${t.label} ${count(t.key)}`).join(", ")}>
+            {SENTIMENT_TONES.map((t) => count(t.key) > 0 && <div key={t.key} className={t.bar} style={{ width: `${(count(t.key) / rated.length) * 100}%` }} />)}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1.5 text-sm">
+            {SENTIMENT_TONES.map((t) => (
+              <span key={t.key} className="flex items-center gap-2">
+                <span className={cn("size-2.5 rounded-full", t.bar)} aria-hidden />
+                {t.label} <span className="font-semibold tabular-nums">{count(t.key)}</span>
+              </span>
+            ))}
+            <span className="text-muted-foreground">of {rated.length} answers that mention you</span>
+          </div>
+          {quotes.length > 0 && (
+            <ul className="mt-6 space-y-3 border-t pt-6">
+              {quotes.map((r, i) => {
+                const tone = SENTIMENT_TONES.find((t) => t.key === r.sentiment);
+                return (
+                  <li key={i} className="rounded-xl bg-surface p-4 text-sm">
+                    <p className="leading-normal">“{r.context}”</p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      <span className={cn("font-medium", tone?.text)}>{tone?.label}</span> · {providerNames[r.provider] ?? r.provider} · {r.prompt}
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
+      )}
+    </Card>
   );
 }
 
@@ -479,6 +540,7 @@ function Questions({ result, providerNames }: { result: Result; providerNames: R
                       <span className={res.brandMentioned ? "text-blue-700" : "text-orange-800"}>
                         {res.brandMentioned ? `mentions you${res.position ? ` (#${res.position})` : ""}` : "doesn't mention you"}
                       </span>
+                      {res.sentiment && <span className="font-normal text-muted-foreground"> · {res.sentiment}</span>}
                     </p>
                     {res.competitors.length > 0 && <p className="text-muted-foreground">Brands named: {res.competitors.slice(0, 8).join(", ")}</p>}
                     <p className="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg bg-surface p-3 text-xs leading-relaxed">{res.response}</p>
