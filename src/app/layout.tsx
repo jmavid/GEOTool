@@ -54,7 +54,12 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <main className="flex flex-1 flex-col">{children}</main>
         <footer className="border-t print:hidden">
           <div className="mx-auto flex w-full max-w-6xl flex-wrap justify-between gap-4 px-4 py-8 text-sm text-muted-foreground sm:px-8">
-            <span>© {new Date().getFullYear()} GEO Score</span>
+            <span className="flex flex-wrap gap-x-5 gap-y-1">
+              <span>© {new Date().getFullYear()} GEO Score</span>
+              <Link href="/pricing" className="hover:text-foreground">Pricing</Link>
+              <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
+              <Link href="/terms" className="hover:text-foreground">Terms</Link>
+            </span>
             <span>Results come from real questions asked to AI models. Answers vary over time.</span>
           </div>
         </footer>

@@ -9,6 +9,8 @@ import { appUrl } from "@/lib/tracking";
 
 export type PaidPlan = Exclude<Plan, "FREE">;
 export const PAID_PLANS: PaidPlan[] = ["STARTER", "PRO", "AGENCY"];
+/** A paid plan id from untrusted input (query string, form), or null. */
+export const paidPlan = (v: unknown): PaidPlan | null => (PAID_PLANS.includes(v as PaidPlan) ? (v as PaidPlan) : null);
 /** past_due keeps the plan while Stripe retries the card; anything else (canceled, unpaid...) drops to FREE. */
 const PAYING_STATUSES = new Set(["active", "trialing", "past_due"]);
 
@@ -49,6 +51,16 @@ export async function checkoutUrl(user: User, plan: PaidPlan): Promise<string> {
     line_items: [{ price: prices()[plan], quantity: 1 }],
     allow_promotion_codes: true,
     subscription_data: { metadata: { userId: user.id } },
+    // EU VAT: Stripe Tax computes it from the billing address; companies can add their VAT id (reverse charge).
+    // Needs Stripe Tax enabled in the dashboard, hence the flag.
+    ...(env("STRIPE_AUTOMATIC_TAX") === "true"
+      ? {
+          automatic_tax: { enabled: true },
+          billing_address_collection: "required" as const,
+          tax_id_collection: { enabled: true },
+          customer_update: { address: "auto" as const, name: "auto" as const },
+        }
+      : {}),
     success_url: `${appUrl()}/dashboard?checkout=success`,
     cancel_url: `${appUrl()}/pricing`,
   });
@@ -103,4 +115,13 @@ export async function handleStripeWebhook(rawBody: string, signature: string): P
       break;
     }
   }
+}
+
+/** Account deletion: ends billing right away (no further charges). Stripe keeps past invoices, as tax law requires. */
+export async function cancelSubscriptionNow(user: User): Promise<void> {
+  if (!user.stripeSubscriptionId || user.plan === "FREE") return;
+  if (!billingConfigured()) throw new UserError("We couldn't reach the payment provider. Please try again later.");
+  const s = stripe();
+  const sub = await s.subscriptions.retrieve(user.stripeSubscriptionId);
+  if (sub.status !== "canceled" && sub.status !== "incomplete_expired") await s.subscriptions.cancel(sub.id);
 }

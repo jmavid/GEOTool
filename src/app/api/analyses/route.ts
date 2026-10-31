@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createAnalysis } from "@/lib/analyses";
 import { currentUser } from "@/lib/auth/session";
-import { publicMessage } from "@/lib/errors";
+import { ANALYSIS_FAILED, publicMessage } from "@/lib/errors";
 import { burstLimited } from "@/lib/security/rate-limit";
 import { verifyTurnstile } from "@/lib/security/turnstile";
 
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     const { id, reused } = await createAnalysis(parsed.data.url, ip, await currentUser());
     return NextResponse.json({ id, reused }, { status: reused ? 200 : 201 });
   } catch (err) {
-    const message = publicMessage(err);
+    const message = publicMessage(err, ANALYSIS_FAILED);
     if (message.startsWith("Something went wrong")) console.error("create analysis failed:", err);
     return NextResponse.json({ error: message }, { status: message.startsWith("Something went wrong") ? 500 : 400 });
   }

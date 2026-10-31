@@ -50,7 +50,12 @@
     // Stripe Price ids (price_...) of the monthly plans. Billing switches on when these AND the Stripe secrets are set.
     "STRIPE_PRICE_STARTER": "",
     "STRIPE_PRICE_PRO": "",
-    "STRIPE_PRICE_AGENCY": ""
+    "STRIPE_PRICE_AGENCY": "",
+    // "true" once Stripe Tax is enabled: VAT by billing address + VAT id field at checkout.
+    "STRIPE_AUTOMATIC_TAX": "false",
+    // Shown on /privacy and /terms: who runs the service (name or company, address, VAT id) and a contact address.
+    "LEGAL_NAME": "",
+    "CONTACT_EMAIL": ""
   }
   // Secrets (wrangler secret put): INTERNAL_SECRET, IP_HASH_SALT, TURNSTILE_SECRET_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
   // Only for EXTERNAL_PROVIDERS: OPENAI_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY, PERPLEXITY_API_KEY

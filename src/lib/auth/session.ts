@@ -22,8 +22,8 @@ const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 const newToken = () => randomBytes(32).toString("base64url");
 export const isTokenShape = (t: string) => /^[A-Za-z0-9_-]{43}$/.test(t);
 
-/** Emails a single-use sign-in link. Says nothing about whether the address has an account. */
-export async function requestLoginLink(rawEmail: string, ip: string): Promise<void> {
+/** Emails a single-use sign-in link. Says nothing about whether the address has an account. `plan`: resume checkout after. */
+export async function requestLoginLink(rawEmail: string, ip: string, plan: string | null = null): Promise<void> {
   if (!emailConfigured()) throw new UserError("Sign-in isn't open yet. Please check back soon.");
   const email = rawEmail.trim().toLowerCase();
   const db = getDb();
@@ -39,7 +39,7 @@ export async function requestLoginLink(rawEmail: string, ip: string): Promise<vo
 
   const token = newToken();
   await db.insert(schema.loginTokens).values({ id: sha256(token), email, ipHash, expiresAt: new Date(Date.now() + LINK_MINUTES * 60_000) });
-  const sent = await sendEmail(loginEmail({ to: email, loginUrl: `${appUrl()}/auth/verify/${token}`, minutes: LINK_MINUTES }));
+  const sent = await sendEmail(loginEmail({ to: email, loginUrl: `${appUrl()}/auth/verify/${token}${plan ? `?plan=${plan}` : ""}`, minutes: LINK_MINUTES }));
   if (!sent) throw new UserError("We couldn't send the email. Please try again later.");
 }
 
@@ -116,4 +116,16 @@ export function sameOrigin(req: Request): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Erases the account: sessions, projects and their website links (cascade), sign-in links and tracking emails for this
+ * address. Analyses stay (reports are shareable and hold no personal data) but lose the link to the user.
+ */
+export async function deleteAccount(user: User): Promise<void> {
+  const db = getDb();
+  await db.delete(schema.subscriptions).where(eq(schema.subscriptions.email, user.email));
+  await db.delete(schema.loginTokens).where(eq(schema.loginTokens.email, user.email));
+  await db.delete(schema.users).where(eq(schema.users.id, user.id));
+  (await cookies()).delete(SESSION_COOKIE);
 }

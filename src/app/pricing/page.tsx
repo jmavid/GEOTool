@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { PLANS as PLAN_IDS, type Plan } from "@/db/schema";
 import { currentUser } from "@/lib/auth/session";
-import { billingConfigured } from "@/lib/billing";
+import { billingConfigured, paidPlan } from "@/lib/billing";
 import { PLANS, promptsFor } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
@@ -24,8 +24,9 @@ function features(plan: Plan): string[] {
   ];
 }
 
-export default async function PricingPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const [{ error }, user] = await Promise.all([searchParams, currentUser()]);
+export default async function PricingPage({ searchParams }: { searchParams: Promise<{ error?: string; plan?: string }> }) {
+  const [{ error, plan }, user] = await Promise.all([searchParams, currentUser()]);
+  const resume = user?.plan === "FREE" ? paidPlan(plan) : null;
   const live = billingConfigured();
 
   return (
@@ -34,8 +35,17 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
         <div className="flex max-w-2xl flex-col gap-3">
           <p className="font-mono text-xs uppercase tracking-[0.08em] text-brand-ink">Pricing</p>
           <h1 className="text-balance text-4xl font-semibold tracking-[-0.03em] sm:text-5xl">See if your fixes work, every week</h1>
-          <p className="text-lg text-muted-foreground">Monthly plans, cancel anytime. Prices include the AI costs.</p>
+          <p className="text-lg text-muted-foreground">Monthly plans, cancel anytime. Taxes are calculated at checkout.</p>
         </div>
+        {resume && live && (
+          <form method="post" action="/api/billing/checkout" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand/20 bg-brand-soft p-5">
+            <p className="font-medium">You&apos;re signed in. Continue with the {PLANS[resume].label} plan?</p>
+            <input type="hidden" name="plan" value={resume} />
+            <button type="submit" className="inline-flex h-11 items-center rounded-xl bg-brand px-5 font-semibold text-brand-foreground hover:bg-brand/90">
+              Continue to checkout
+            </button>
+          </form>
+        )}
         {error && (
           <p role="alert" className="rounded-xl border border-destructive/30 bg-background px-4 py-3 text-sm text-destructive">
             {error}

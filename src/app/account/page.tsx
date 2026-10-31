@@ -89,6 +89,29 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
           </form>
         )}
 
+        <form method="post" action="/api/account/delete" className="flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-background p-6">
+          <h2 className="text-lg font-semibold">Delete account</h2>
+          <p className="text-sm text-muted-foreground">
+            Cancels your subscription right away and erases your account, projects and email settings. Shared report links keep working.
+            This can&apos;t be undone.
+          </p>
+          <label htmlFor="confirm" className="text-sm font-medium">
+            Type <span className="font-mono">{user.email}</span> to confirm
+          </label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              id="confirm"
+              name="confirm"
+              autoComplete="off"
+              required
+              className="h-11 min-w-0 flex-1 rounded-xl border bg-background px-3.5 text-[15px] outline-none focus-visible:border-destructive"
+            />
+            <button type="submit" className="inline-flex h-11 items-center rounded-xl bg-destructive px-4 font-semibold text-white hover:bg-destructive/90">
+              Delete my account
+            </button>
+          </div>
+        </form>
+
         <form method="post" action="/api/auth/logout">
           <button type="submit" className="text-sm font-medium underline underline-offset-2">
             Sign out

@@ -4,7 +4,9 @@ import { ArrowRight, Check, ChevronDown, Gauge, ListChecks, MessageSquareText, C
 import { UrlForm } from "@/components/url-form";
 import { turnstileSiteKey } from "@/lib/security/turnstile";
 import { activeProviders, EXTERNAL_PROVIDERS } from "@/providers";
-import { promptsFor } from "@/lib/plans";
+import { PLANS, promptsFor } from "@/lib/plans";
+
+const PAID = ["STARTER", "PRO", "AGENCY"] as const;
 
 const FEATURES = [
   { icon: Gauge, title: "GEO Score, 0–100", text: "One number built from five signals: brand visibility, recommendations, average position, citations and share of voice." },
@@ -13,8 +15,9 @@ const FEATURES = [
   { icon: ListChecks, title: "A prioritized fix list", text: "Each fix comes with the problem, the evidence from the answers, what to do, and how hard it is." },
 ];
 
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ deleted?: string }> }) {
   await connection(); // read the Turnstile key and model list at request time, not at build time
+  const { deleted } = await searchParams;
   const siteKey = turnstileSiteKey();
   const tested = activeProviders();
   const comingSoon = EXTERNAL_PROVIDERS.filter((p) => !tested.some((t) => t.id === p.id)).map((p) => p.name);
@@ -37,6 +40,11 @@ export default async function Home() {
 
   return (
     <>
+      {deleted && (
+        <p role="status" className="w-full border-b bg-brand-soft px-4 py-3 text-center text-sm">
+          Your account was deleted and your subscription cancelled.
+        </p>
+      )}
       <section className="mx-auto w-full grid max-w-6xl items-center gap-12 px-4 pb-24 pt-16 sm:px-8 sm:pt-24 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
         <div className="flex flex-col gap-6">
           <p className="inline-flex items-center gap-2 self-start rounded-full bg-brand-soft px-3 py-1.5 text-[13px] font-medium text-brand-ink">
@@ -104,6 +112,31 @@ export default async function Home() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section id="plans" className="scroll-mt-16 border-t bg-surface py-24">
+        <div className="mx-auto flex max-w-6xl flex-col gap-10 px-4 sm:px-8">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <SectionHeading eyebrow="Plans" title="See if your fixes work, every week" />
+            <Link href="/pricing" className="inline-flex items-center gap-1.5 font-medium hover:underline">
+              Compare plans <ArrowRight className="size-4" aria-hidden />
+            </Link>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            {PAID.map((id) => (
+              <Link key={id} href="/pricing" className="flex flex-col gap-2 rounded-2xl border bg-background p-6 hover:border-brand">
+                <span className="text-lg font-semibold">{PLANS[id].label}</span>
+                <span>
+                  <span className="text-3xl font-semibold tracking-tight">€{PLANS[id].priceEurMonth}</span>
+                  <span className="text-sm text-muted-foreground"> / month</span>
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  {PLANS[id].websites} website{PLANS[id].websites > 1 ? "s" : ""} · {promptsFor(id)} questions · weekly email{PLANS[id].reports ? " · client reports" : ""}
+                </span>
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
 

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Turnstile } from "@/components/turnstile";
 
-export function LoginForm({ turnstileSiteKey = null }: { turnstileSiteKey?: string | null }) {
+export function LoginForm({ turnstileSiteKey = null, plan = null }: { turnstileSiteKey?: string | null; plan?: string | null }) {
   const inputId = useId();
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
@@ -25,7 +25,7 @@ export function LoginForm({ turnstileSiteKey = null }: { turnstileSiteKey?: stri
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, turnstileToken: token ?? undefined }),
+        body: JSON.stringify({ email, plan: plan ?? undefined, turnstileToken: token ?? undefined }),
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(data.error ?? "Something went wrong.");
@@ -65,6 +65,17 @@ export function LoginForm({ turnstileSiteKey = null }: { turnstileSiteKey?: stri
       <Button type="submit" disabled={state === "sending"} className="h-12 rounded-xl bg-brand text-base font-semibold text-brand-foreground hover:bg-brand/90">
         {state === "sending" ? "Sending…" : "Email me a sign-in link"}
       </Button>
+      <p className="text-xs text-muted-foreground">
+        By continuing you accept the{" "}
+        <a href="/terms" className="underline underline-offset-2">
+          Terms
+        </a>{" "}
+        and{" "}
+        <a href="/privacy" className="underline underline-offset-2">
+          Privacy notice
+        </a>
+        .
+      </p>
       {turnstileSiteKey && <Turnstile siteKey={turnstileSiteKey} onToken={setToken} resetSignal={resetSignal} />}
       {error && (
         <p role="alert" className="text-sm text-destructive">
