@@ -1,0 +1,17 @@
+# Local secrets for `next dev` and `wrangler dev`. Copy to .dev.vars.
+# Production: npx wrangler secret put <NAME>
+INTERNAL_SECRET=change-me-long-random-string
+IP_HASH_SALT=change-me
+# Cloudflare Turnstile test keys (always pass). Real keys: dashboard > Turnstile > Add widget
+TURNSTILE_SITE_KEY=1x00000000000000000000AA
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
+# External providers: off unless EXTERNAL_PROVIDERS lists them (wrangler.jsonc)
+OPENAI_API_KEY=
+GEMINI_API_KEY=
+ANTHROPIC_API_KEY=
+PERPLEXITY_API_KEY=
+# Optional overrides
+# FREE_PROMPTS_PER_ANALYSIS=25
+# AI_CONCURRENCY=10
+# LLM_CACHE_TTL_HOURS=72
+# SHOW_COSTS=true

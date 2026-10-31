@@ -1,0 +1,53 @@
+{
+  // Copy to wrangler.jsonc (git-ignored) and fill in your own ids. wrangler.jsonc is what deploys.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "geotool",
+  // Custom entry: OpenNext's fetch handler + the queue consumer that runs analyses.
+  "main": "worker.js",
+  "compatibility_date": "2026-10-01",
+  // global_fetch_strictly_public: Cloudflare-level SSRF guard, outbound fetch can only reach the public internet.
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "observability": { "enabled": true },
+  // Workers AI: every LLM call (analysis + visibility test) runs here, nothing leaves Cloudflare.
+  "ai": { "binding": "AI" },
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "geotool" }],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "geotool",
+      "database_id": "<your-d1-database-id>",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "queues": {
+    "producers": [{ "binding": "ANALYSIS_QUEUE", "queue": "geotool-analyses" }],
+    "consumers": [{ "queue": "geotool-analyses", "max_batch_size": 1, "max_retries": 0, "max_concurrency": 5 }]
+  },
+  // Weekly tracking: Mondays 07:00 UTC, re-runs every website with a confirmed subscriber (see src/lib/tracking.ts).
+  "triggers": { "crons": ["0 7 * * 1"] },
+  // Weekly emails go through Cloudflare Email Service. Once a sending domain is onboarded, add:
+  //   "send_email": [{ "name": "EMAIL" }]
+  // and set EMAIL_FROM below. Until both exist, sign-ups are kept as a waitlist and no weekly run is queued.
+  "vars": {
+    "AI_ANALYSIS_MODEL": "@cf/openai/gpt-oss-120b",
+    // Comma-separated Workers AI models asked the buyer questions (each one is an "engine" in the report).
+    "AI_VISIBILITY_MODELS": "@cf/openai/gpt-oss-120b,@cf/deepseek-ai/deepseek-v4.1-flash-1017",
+    // External assistants (openai,gemini,claude,perplexity) stay off unless listed here AND their key is set.
+    "EXTERNAL_PROVIDERS": "",
+    "FREE_ANALYSES_PER_IP_PER_DAY": "3",
+    // Global cap on new analyses per 24h (Workers AI budget guard).
+    "MAX_ANALYSES_PER_DAY": "100",
+    // Public Turnstile site key. Turnstile switches on when this AND the TURNSTILE_SECRET_KEY secret are set.
+    "TURNSTILE_SITE_KEY": "",
+    "SHOW_COSTS": "false",
+    // Public base URL used in email links.
+    "APP_URL": "https://geotool.<your-subdomain>.workers.dev",
+    // Sender for tracking emails, e.g. "GEO Score <scores@yourdomain.com>" (a domain onboarded in Email Service).
+    "EMAIL_FROM": "",
+    // Cap on scheduled re-runs per week (Workers AI budget guard, separate from MAX_ANALYSES_PER_DAY).
+    "MAX_WEEKLY_ANALYSES": "50"
+  }
+  // Secrets (wrangler secret put): INTERNAL_SECRET, IP_HASH_SALT, TURNSTILE_SECRET_KEY
+  // Only for EXTERNAL_PROVIDERS: OPENAI_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY, PERPLEXITY_API_KEY
+}

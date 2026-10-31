@@ -1,0 +1,1 @@
+ALTER TABLE `analyses` ADD `prompts_from_analysis_id` text;
