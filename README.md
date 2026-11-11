@@ -190,6 +190,10 @@ npx wrangler secret put STRIPE_SECRET_KEY
 npx wrangler secret put STRIPE_WEBHOOK_SECRET  # webhook endpoint: https://<your-app>/api/billing/webhook
 npm run deploy
 ```
+Custom domain: with the domain's zone in the same Cloudflare account, uncomment `routes` in `wrangler.jsonc` (apex and
+`www.` as `custom_domain`) and set `APP_URL` to it; Cloudflare creates the DNS records and certificate on deploy.
+`www.` and the workers.dev URL then redirect (308) to `APP_URL`.
+
 Stripe: create a product with three monthly prices and put their ids in `STRIPE_PRICE_STARTER/PRO/AGENCY`; the webhook
 needs the events `checkout.session.completed` and `customer.subscription.created/updated/deleted`. Enable the customer
 portal (plan switching between the three prices). Locally: `stripe listen --forward-to localhost:3000/api/billing/webhook`.

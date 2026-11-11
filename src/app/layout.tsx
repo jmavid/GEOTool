@@ -2,16 +2,21 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { currentUser } from "@/lib/auth/session";
+import { appUrl } from "@/lib/tracking";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
-export const metadata: Metadata = {
-  title: "AI Visibility Checker: do AI assistants recommend your business? | GEO Score",
-  description:
-    "Free GEO (Generative Engine Optimization) check. See how often AI models mention and recommend your brand, who they recommend instead, and what to fix first.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    // Absolute canonical and social URLs on the public domain (APP_URL), whatever host served the page.
+    metadataBase: new URL(appUrl()),
+    title: "AI Visibility Checker: do AI assistants recommend your business? | GEO Score",
+    description:
+      "Free GEO (Generative Engine Optimization) check. See how often AI models mention and recommend your brand, who they recommend instead, and what to fix first.",
+  };
+}
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const user = await currentUser();

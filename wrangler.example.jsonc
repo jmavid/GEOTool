@@ -9,6 +9,11 @@
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "observability": { "enabled": true },
+  // Public domain (a zone in your Cloudflare account). www. and workers.dev redirect to APP_URL (worker.js).
+  // "routes": [
+  //   { "pattern": "yourdomain.com", "custom_domain": true },
+  //   { "pattern": "www.yourdomain.com", "custom_domain": true }
+  // ],
   // Workers AI: every LLM call (analysis + visibility test) runs here, nothing leaves Cloudflare.
   "ai": { "binding": "AI" },
   "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "geotool" }],

@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 export const metadata: Metadata = {
   title: "Pricing | GEO Score",
   description: "Track how AI assistants talk about your brand every week. Plans for one site, several brands, or agencies.",
+  alternates: { canonical: "/pricing" },
 };
 
 function features(plan: Plan): string[] {

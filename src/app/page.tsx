@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { connection } from "next/server";
 import Link from "next/link";
 import { ArrowRight, Check, ChevronDown, Gauge, ListChecks, MessageSquareText, ChartColumn } from "lucide-react";
@@ -7,6 +8,8 @@ import { activeProviders, EXTERNAL_PROVIDERS } from "@/providers";
 import { PLANS, promptsFor } from "@/lib/plans";
 
 const PAID = ["STARTER", "PRO", "AGENCY"] as const;
+
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 const FEATURES = [
   { icon: Gauge, title: "GEO Score, 0–100", text: "One number built from five signals: brand visibility, recommendations, average position, citations and share of voice." },

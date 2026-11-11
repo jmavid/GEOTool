@@ -3,9 +3,15 @@
 // whole pipeline runs inside the Next.js bundle and only has to be built once.
 // Plain JS on purpose: `.open-next/worker.js` only exists after `opennextjs-cloudflare build`.
 import { default as handler } from "./.open-next/worker.js";
+import { canonicalRedirect } from "./canonical-host.js";
 
 export default {
-  fetch: handler.fetch,
+  /** One public address (APP_URL): www. and the workers.dev URL redirect there, keeping path and query. */
+  async fetch(request, env, ctx) {
+    const target = canonicalRedirect(request.url, env.APP_URL);
+    if (target) return Response.redirect(target, 308);
+    return handler.fetch(request, env, ctx);
+  },
 
   /** @param {MessageBatch<{ analysisId: string }>} batch */
   async queue(batch, env) {
