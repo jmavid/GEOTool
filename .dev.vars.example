@@ -12,10 +12,9 @@ STRIPE_PRICE_STARTER=
 STRIPE_PRICE_PRO=
 STRIPE_PRICE_AGENCY=
 # STRIPE_AUTOMATIC_TAX=true
-# External providers: on for paid plans when listed in EXTERNAL_PROVIDERS (wrangler.jsonc) and their key is set here
-OPENAI_API_KEY=
+# ChatGPT and Claude are billed through Cloudflare (AI Gateway credits) and need no key.
+# Gemini and Perplexity (untested) still need their own:
 GEMINI_API_KEY=
-ANTHROPIC_API_KEY=
 PERPLEXITY_API_KEY=
 # Optional overrides
 # FREE_PROMPTS_PER_ANALYSIS=25

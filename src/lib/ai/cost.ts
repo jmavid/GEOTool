@@ -12,7 +12,7 @@ const PRICES: Record<string, { input: number; output: number }> = {
   "@cf/meta/llama-3.3-70b-instruct-fp8-fast": { input: 0.293, output: 2.253 },
   "@cf/google/gemma-4-26b-a4b-it": { input: 0.1, output: 0.3 },
   "@cf/mistralai/mistral-small-3.1-24b-instruct": { input: 0.351, output: 0.555 },
-  // External providers (only used if EXTERNAL_PROVIDERS enables them)
+  // External providers (only used if EXTERNAL_PROVIDERS enables them; through AI Gateway they use the same prices)
   "gpt-5": { input: 1.25, output: 10 },
   "gpt-5-mini": { input: 0.25, output: 2 },
   "gpt-5-nano": { input: 0.05, output: 0.4 },
@@ -35,7 +35,15 @@ const DEFAULT_PRICE = { input: 2.5, output: 10 };
 /** USD per web-search tool call (OpenAI / Gemini grounding / Claude web search are all ~$10 per 1k). */
 export const WEB_SEARCH_CALL_USD = 0.01;
 
-export function priceFor(model: string) {
+/** Unified Billing passes provider prices through, but adds 5% when credits are bought. */
+const UNIFIED_BILLING_FEE = 1.05;
+
+export function priceFor(model: string): { input: number; output: number } {
+  // AI Gateway ids ("anthropic/claude-haiku-5.5") price like the provider's own model, plus the credit fee.
+  if (/^(openai|anthropic|google-ai-studio)\//.test(model)) {
+    const p = priceFor(model.split("/")[1].replace(/\./g, "-"));
+    return { input: p.input * UNIFIED_BILLING_FEE, output: p.output * UNIFIED_BILLING_FEE };
+  }
   if (PRICES[model]) return PRICES[model];
   // Match by longest known prefix, e.g. "gpt-5-mini-2025-08-07" -> "gpt-5-mini"
   const key = Object.keys(PRICES)
