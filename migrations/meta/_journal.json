@@ -43,6 +43,13 @@
       "when": 1794763340979,
       "tag": "0005_leads",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1794765565510,
+      "tag": "0006_lead_token",
+      "breakpoints": true
     }
   ]
 }

@@ -26,8 +26,9 @@ export default function PrivacyPage() {
           billing.
         </li>
         <li>
-          <strong>Your email address</strong>, if you ask us to email you a report: to send that report and, only if you tick the box, occasional
-          tips about AI visibility. We also see the website you checked.
+          <strong>Your email address</strong>, which we ask for before showing a report: to give you that report and email you a copy, and, only
+          if you tick the box, occasional tips about AI visibility. We also see which websites you checked. A cookie remembers it so your next
+          reports open without asking again.
         </li>
         <li>
           <strong>Billing details</strong> are handled by Stripe. We only keep your Stripe customer id and subscription status; we never see your
@@ -50,7 +51,7 @@ export default function PrivacyPage() {
       <p>The AI models are only sent public information about websites, never your email or payment details.</p>
 
       <h2>Cookies</h2>
-      <p>One strictly necessary cookie keeps you signed in. Turnstile may set its own to check you&apos;re human. No analytics or advertising cookies.</p>
+      <p>One strictly necessary cookie keeps you signed in, and another remembers that you gave your email for reports. Turnstile may set its own to check you&apos;re human. No analytics or advertising cookies.</p>
 
       <h2>How long we keep it</h2>
       <p>

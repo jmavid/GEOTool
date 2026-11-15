@@ -6,12 +6,17 @@ import { ArrowRight, Check, Mail } from "lucide-react";
 
 const storageKey = (id: string) => `geo-lead:${id}`;
 
-/** "Email me the report" while the analysis runs: the visitor can leave and still get the result. */
-export function EmailReportForm({ analysisId, brand }: { analysisId: string; brand: string }) {
+/**
+ * The email a visitor must give to open a finished report. While the analysis runs it is offered early ("running"), so
+ * they can leave and get the result by email; on a finished report it is the only way in ("locked").
+ */
+export function EmailReportForm({ analysisId, brand, variant, onDone }: { analysisId: string; brand: string; variant: "running" | "locked"; onDone?: () => void }) {
+  const locked = variant === "locked";
   const [email, setEmail] = useState("");
   const [marketing, setMarketing] = useState(false);
   // Only rendered after the report loads in the browser, so reading storage here never mismatches the server HTML.
   const [sentTo, setSentTo] = useState<string | null>(() => {
+    if (locked) return null; // the server decides: a remembered address doesn't open a report without its cookie
     try {
       return localStorage.getItem(storageKey(analysisId));
     } catch {
@@ -38,6 +43,7 @@ export function EmailReportForm({ analysisId, brand }: { analysisId: string; bra
       try {
         localStorage.setItem(storageKey(analysisId), saved);
       } catch {}
+      onDone?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "We couldn't save your email. Try again.");
     } finally {
@@ -52,7 +58,13 @@ export function EmailReportForm({ analysisId, brand }: { analysisId: string; bra
           <Check className="size-3.5 text-blue-700" strokeWidth={3} aria-hidden />
         </span>
         <p className="text-[15px] leading-normal">
-          Done. We&apos;ll email the report for {brand} to <strong className="break-all">{sentTo}</strong> as soon as it&apos;s ready. You can close this page.
+          {locked ? (
+            <>Opening your report…</>
+          ) : (
+            <>
+              Done. Your report opens here when it&apos;s ready, and we&apos;ll email it to <strong className="break-all">{sentTo}</strong>. You can close this page.
+            </>
+          )}
         </p>
       </section>
     );
@@ -61,10 +73,12 @@ export function EmailReportForm({ analysisId, brand }: { analysisId: string; bra
   return (
     <section className="mt-6 rounded-2xl border border-brand/20 bg-brand-soft p-5 sm:p-7">
       <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-        <Mail className="size-5 text-brand" aria-hidden /> Don&apos;t wait here: get the report by email
+        <Mail className="size-5 text-brand" aria-hidden /> {locked ? "Enter your email to see the report" : "Where should we send your report?"}
       </h2>
       <p className="mt-1 text-sm leading-normal text-muted-foreground">
-        Your GEO Score, who AI recommends instead of {brand}, and the fix that matters most, in your inbox when it&apos;s ready.
+        {locked
+          ? `Your GEO Score, who AI recommends instead of ${brand}, and your action plan. We'll also email you a copy.`
+          : `You'll need your email to open the results. Leave it now and we'll also send the report when it's ready, so you don't have to wait here.`}
       </p>
       <form onSubmit={submit} className="mt-4">
         <div className="flex flex-col gap-2.5 sm:flex-row">
@@ -87,7 +101,7 @@ export function EmailReportForm({ analysisId, brand }: { analysisId: string; bra
             disabled={busy}
             className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand px-5 font-semibold text-brand-foreground hover:bg-brand/90 disabled:opacity-60"
           >
-            {busy ? "Saving…" : "Email me the report"} {!busy && <ArrowRight className="size-4" aria-hidden />}
+            {busy ? "Saving…" : locked ? "See my report" : "Send me the report"} {!busy && <ArrowRight className="size-4" aria-hidden />}
           </button>
         </div>
         <label className="mt-3 flex items-start gap-2.5 text-sm text-muted-foreground">
@@ -100,7 +114,7 @@ export function EmailReportForm({ analysisId, brand }: { analysisId: string; bra
           </p>
         )}
         <p className="mt-3 text-xs text-muted-foreground">
-          We use your email to send this report{marketing ? " and the tips you asked for" : ""}. See our{" "}
+          We use your email to give you this report{marketing ? " and the tips you asked for" : ""}. No account, no spam. See our{" "}
           <Link href="/privacy" className="underline underline-offset-2">
             privacy policy
           </Link>

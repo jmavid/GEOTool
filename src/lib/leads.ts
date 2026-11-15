@@ -25,7 +25,7 @@ export function normalizeEmail(raw: string): string | null {
  * Saves a visitor's email for a report, tells the owner, and emails the report at once if it is already finished.
  * The report email itself is sent when the analysis ends (see notifyLeads).
  */
-export async function saveLead(input: { analysisId: string; email: string; marketing: boolean; meta: RequestMeta }): Promise<{ ready: boolean }> {
+export async function saveLead(input: { analysisId: string; email: string; marketing: boolean; meta: RequestMeta }): Promise<{ ready: boolean; token: string }> {
   const email = normalizeEmail(input.email);
   if (!email) throw new UserError("Enter a valid email address.");
   const db = getDb();
@@ -42,16 +42,59 @@ export async function saveLead(input: { analysisId: string; email: string; marke
   }
 
   const existing = await db.query.leads.findFirst({ where: and(eq(schema.leads.email, email), eq(schema.leads.analysisId, analysis.id)) });
+  let token = existing?.token ?? null;
   if (existing) {
     if (input.marketing && !existing.marketingConsent) await db.update(schema.leads).set({ marketingConsent: true }).where(eq(schema.leads.id, existing.id));
   } else {
-    await db.insert(schema.leads).values({ email, analysisId: analysis.id, websiteId: analysis.websiteId, marketingConsent: input.marketing, ipHash });
+    const [row] = await db
+      .insert(schema.leads)
+      .values({ email, analysisId: analysis.id, websiteId: analysis.websiteId, marketingConsent: input.marketing, ipHash })
+      .returning({ token: schema.leads.token });
+    token = row.token;
     await notifyOwnerOfLead(email, analysis.websiteId, analysis.id, input.marketing, input.meta);
+  }
+  if (!token) {
+    token = crypto.randomUUID();
+    await db.update(schema.leads).set({ token }).where(eq(schema.leads.id, existing!.id));
   }
 
   const done = analysis.status === "COMPLETED" || analysis.status === "FAILED";
   if (done) await notifyLeads(analysis.id);
-  return { ready: done };
+  return { ready: done, token };
+}
+
+/** Cookie that remembers a visitor already gave their email, so their reports open without asking again. */
+export const LEAD_COOKIE = "gg_contact";
+export const LEAD_COOKIE_MAX_AGE = 365 * 24 * 3600;
+const TOKEN_RE = /^[0-9a-f-]{32,36}$/;
+
+/** The email behind an access token (cookie or email link), or null. */
+export async function contactForToken(token: string | undefined | null): Promise<string | null> {
+  if (!token || !TOKEN_RE.test(token)) return null;
+  const lead = await getDb().query.leads.findFirst({ columns: { email: true }, where: eq(schema.leads.token, token) });
+  return lead?.email ?? null;
+}
+
+/**
+ * Whether this viewer may see a finished report: signed-in users always can; anyone else must have given an email.
+ * A known contact opening another report is recorded as asking for it too, so it is also emailed to them.
+ * `added` says a new request was recorded, so the caller can email the report after responding.
+ */
+export async function reportAccess(analysisId: string, viewer: { signedIn: boolean; token?: string | null }): Promise<{ allowed: boolean; added: boolean }> {
+  if (viewer.signedIn) return { allowed: true, added: false };
+  const email = await contactForToken(viewer.token);
+  if (!email) return { allowed: false, added: false };
+  const db = getDb();
+  const has = await db.query.leads.findFirst({ columns: { id: true }, where: and(eq(schema.leads.email, email), eq(schema.leads.analysisId, analysisId)) });
+  if (has) return { allowed: true, added: false };
+  const analysis = await db.query.analyses.findFirst({ columns: { websiteId: true }, where: eq(schema.analyses.id, analysisId) });
+  if (!analysis) return { allowed: false, added: false };
+  const inserted = await db
+    .insert(schema.leads)
+    .values({ email, analysisId, websiteId: analysis.websiteId })
+    .onConflictDoNothing()
+    .returning({ id: schema.leads.id });
+  return { allowed: true, added: inserted.length > 0 };
 }
 
 async function notifyOwnerOfLead(email: string, websiteId: string, analysisId: string, marketing: boolean, meta: RequestMeta) {
@@ -101,7 +144,7 @@ export async function notifyLeads(analysisId: string): Promise<number> {
           mentioned: totals?.mentioned ?? 0,
           responses: totals?.responses ?? 0,
           topFix: topFix?.title ?? null,
-          reportUrl: `${appUrl()}/report/${analysisId}`,
+          reportUrl: lead.token ? openReportUrl(lead.token, analysisId) : `${appUrl()}/report/${analysisId}`,
           homeUrl: appUrl(),
         }),
       );
@@ -117,6 +160,9 @@ export async function notifyLeads(analysisId: string): Promise<number> {
     return 0;
   }
 }
+
+/** The link in the report email: it sets the access cookie, so the report opens on any device. */
+export const openReportUrl = (token: string, analysisId: string) => `${appUrl()}/api/leads/open?k=${token}&r=${analysisId}`;
 
 /** The contacts who asked for this report, for the owner's email. */
 export async function leadEmailsFor(analysisId: string): Promise<string[]> {

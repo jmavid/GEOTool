@@ -41,7 +41,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
       "A weighted mix of how often you are mentioned, how often you are recommended, your average position in lists, the citations to your site, and your share of voice against competitors. The report shows each part and its weight.",
     ],
     ["Why does my score change between runs?", "AI answers vary. We reuse the same questions for your site each time, so the trend is comparable even when single answers move."],
-    ["Is it really free?", "The check is: a full analysis with no account. Paid plans add weekly re-checks with an email every Monday, more questions per analysis, more websites, and client reports for agencies."],
+    ["Is it really free?", "Yes: a full analysis with no account. We only ask for your email to give you the report. Paid plans add weekly re-checks with an email every Monday, more questions per analysis, more websites, and client reports for agencies."],
   ];
 
   return (
@@ -55,7 +55,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
         <div className="flex flex-col gap-6">
           <p className="inline-flex items-center gap-2 self-start rounded-full bg-brand-soft px-3 py-1.5 text-[13px] font-medium text-brand-ink">
             <span className="size-1.5 rounded-full bg-brand" />
-            Free AI visibility check · no sign-up
+            Free AI visibility check · no account needed
           </p>
           <h1 className="text-balance text-4xl font-semibold leading-[1.04] tracking-[-0.035em] sm:text-6xl">Do AI assistants recommend your business?</h1>
           <p className="max-w-[34rem] text-lg leading-relaxed text-muted-foreground">

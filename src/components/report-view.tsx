@@ -10,6 +10,8 @@ import { EmailReportForm } from "@/components/email-report-form";
 import { cn } from "@/lib/utils";
 
 type Result = NonNullable<Report["result"]>;
+/** The API hides a finished report's results until the visitor gives an email (see api/analyses/[id]). */
+type ApiReport = Report & { locked?: boolean };
 
 /** Pipeline stages with the progress value each one starts at (see lib/pipeline/run.ts). */
 const STEPS: [string, number][] = [
@@ -29,8 +31,9 @@ function scoreTone(score: number) {
 }
 
 export function ReportView({ id, turnstileSiteKey, viewer }: { id: string; turnstileSiteKey: string | null; viewer: Viewer }) {
-  const [report, setReport] = useState<Report | null>(null);
+  const [report, setReport] = useState<ApiReport | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
@@ -39,7 +42,7 @@ export function ReportView({ id, turnstileSiteKey, viewer }: { id: string; turns
       try {
         const res = await fetch(`/api/analyses/${id}`, { cache: "no-store" });
         if (res.status === 404) return setNotFound(true);
-        const data = (await res.json()) as Report;
+        const data = (await res.json()) as ApiReport;
         if (cancelled) return;
         setReport(data);
         if (data.status === "QUEUED" || data.status === "RUNNING") timer = setTimeout(load, 2500);
@@ -52,7 +55,7 @@ export function ReportView({ id, turnstileSiteKey, viewer }: { id: string; turns
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [id]);
+  }, [id, reloadKey]);
 
   if (notFound) return <Shell><p className="text-muted-foreground">This report doesn&apos;t exist.</p></Shell>;
   if (!report) return <Shell><p className="text-muted-foreground">Loading…</p></Shell>;
@@ -67,6 +70,7 @@ export function ReportView({ id, turnstileSiteKey, viewer }: { id: string; turns
       </Shell>
     );
   }
+  if (report.locked) return <Locked report={report} onUnlocked={() => setReloadKey((k) => k + 1)} />;
   if (!report.result) return <Running report={report} />;
   return <Completed report={report} result={report.result} viewer={viewer} />;
 }
@@ -99,7 +103,7 @@ function Running({ report }: { report: Report }) {
       </h1>
       <p className="mt-2 text-muted-foreground">Usually 3–8 minutes. You can leave this page: the report link keeps working.</p>
 
-      <EmailReportForm analysisId={report.id} brand={report.profile?.brand ?? report.domain} />
+      <EmailReportForm analysisId={report.id} brand={report.profile?.brand ?? report.domain} variant="running" />
 
       <section className="mt-8 rounded-2xl border bg-background p-5 sm:p-7">
         <div className="flex justify-between gap-4 text-sm">
@@ -160,6 +164,18 @@ function Running({ report }: { report: Report }) {
           </dl>
         </section>
       )}
+    </Shell>
+  );
+}
+
+function Locked({ report, onUnlocked }: { report: Report; onUnlocked: () => void }) {
+  const brand = report.profile?.brand ?? report.domain;
+  return (
+    <Shell>
+      <p className="font-mono text-xs text-muted-foreground">{report.domain}</p>
+      <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Your AI visibility report for {brand} is ready</h1>
+      <p className="mt-2 text-muted-foreground">We asked AI models the questions your buyers ask. Enter your email to open the results.</p>
+      <EmailReportForm analysisId={report.id} brand={brand} variant="locked" onDone={onUnlocked} />
     </Shell>
   );
 }

@@ -252,8 +252,9 @@ export const subscriptions = sqliteTable(
 );
 
 /**
- * Contacts left on the report page ("email me the report"). The report email is something they asked for; product
- * news only goes to rows with marketingConsent. Kept until they ask to be removed.
+ * Contacts left on the report page. A finished report only opens after the visitor gives an email (see lib/leads.ts);
+ * the report email is something they asked for, product news only goes to rows with marketingConsent.
+ * Kept until they ask to be removed.
  */
 export const leads = sqliteTable(
   "leads",
@@ -266,9 +267,11 @@ export const leads = sqliteTable(
       .references(() => websites.id, { onDelete: "cascade" }),
     marketingConsent: integer("marketing_consent", { mode: "boolean" }).notNull().default(false),
     ipHash: text("ip_hash"),
+    /** Secret in the access cookie and the email's report link: it unlocks reports for this email. */
+    token: text("token").$defaultFn(() => crypto.randomUUID()),
     /** When the "your report is ready" email went out; null until it is sent. */
     reportSentAt: integer("report_sent_at", { mode: "timestamp_ms" }),
     createdAt: createdAt(),
   },
-  (t) => [uniqueIndex("leads_email_analysis_idx").on(t.email, t.analysisId), index("leads_analysis_idx").on(t.analysisId), index("leads_ip_idx").on(t.ipHash)],
+  (t) => [uniqueIndex("leads_email_analysis_idx").on(t.email, t.analysisId), index("leads_analysis_idx").on(t.analysisId), index("leads_ip_idx").on(t.ipHash), uniqueIndex("leads_token_idx").on(t.token)],
 );

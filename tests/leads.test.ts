@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeEmail } from "@/lib/leads";
+import { contactForToken, normalizeEmail, openReportUrl } from "@/lib/leads";
 import { ownerAnalysisEmail, ownerLeadEmail, reportReadyEmail } from "@/lib/email/templates";
 
 describe("lead emails", () => {
@@ -57,5 +57,19 @@ describe("owner emails about contacts", () => {
       userAgent: null, engines: [], costUsd: 0.1, seconds: 300, at: new Date("2026-11-15T09:30:00Z"),
     });
     expect(m.text).toContain("Contact: ana@example.com");
+  });
+});
+
+describe("report access links", () => {
+  it("puts the contact's token and the report in the email link", () => {
+    expect(openReportUrl("0f1e2d3c-4b5a-4678-9abc-def012345678", "11111111-2222-4333-8444-555555555555")).toMatch(
+      /\/api\/leads\/open\?k=0f1e2d3c-4b5a-4678-9abc-def012345678&r=11111111-2222-4333-8444-555555555555$/,
+    );
+  });
+
+  it("never looks up malformed tokens", async () => {
+    for (const bad of [undefined, null, "", "x", "' OR 1=1 --", "a".repeat(80)]) {
+      expect(await contactForToken(bad)).toBeNull();
+    }
   });
 });
