@@ -17,11 +17,11 @@ function binding(): SendEmail | undefined {
   }
 }
 
-/** "GEO Score <scores@example.com>" or a bare address. */
+/** "GEO Garner <scores@example.com>" or a bare address. */
 export function parseSender(raw: string): { name: string; email: string } | null {
   const m = raw.trim().match(/^(?:(.*?)\s*<([^<>\s]+@[^<>\s]+)>|([^<>\s]+@[^<>\s]+))$/);
   if (!m) return null;
-  return { name: (m[1] ?? "").replace(/^"|"$/g, "").trim() || "GEO Score", email: m[2] ?? m[3] };
+  return { name: (m[1] ?? "").replace(/^"|"$/g, "").trim() || "GEO Garner", email: m[2] ?? m[3] };
 }
 
 const isDev = () => process.env.NODE_ENV !== "production";

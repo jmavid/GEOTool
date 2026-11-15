@@ -8,7 +8,7 @@ import { PLANS, promptsFor } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
-  title: "Pricing | GEO Score",
+  title: "Pricing | GEO Garner",
   description: "Track how AI assistants talk about your brand every week. Plans for one site, several brands, or agencies.",
   alternates: { canonical: "/pricing" },
 };

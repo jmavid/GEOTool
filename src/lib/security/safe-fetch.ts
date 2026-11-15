@@ -15,7 +15,7 @@ export interface SafeFetchResult {
   truncated: boolean;
 }
 
-const USER_AGENT = "Mozilla/5.0 (compatible; GEOScoreBot/0.1)";
+const USER_AGENT = "Mozilla/5.0 (compatible; GEOGarnerBot/0.1)";
 const DOH_URL = "https://cloudflare-dns.com/dns-query";
 
 type Resolver = (hostname: string) => Promise<string[]>;

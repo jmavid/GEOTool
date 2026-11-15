@@ -7,7 +7,7 @@ import { paidPlan } from "@/lib/billing";
 import { emailConfigured } from "@/lib/email/send";
 import { turnstileSiteKey } from "@/lib/security/turnstile";
 
-export const metadata: Metadata = { title: "Sign in | GEO Score", robots: { index: false } };
+export const metadata: Metadata = { title: "Sign in | GEO Garner", robots: { index: false } };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ plan?: string }> }) {
   const plan = paidPlan((await searchParams).plan);

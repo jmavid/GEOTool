@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal-page";
 import { LEGAL_UPDATED, operator } from "@/lib/legal";
 
-export const metadata: Metadata = { title: "Privacy | GEO Score" };
+export const metadata: Metadata = { title: "Privacy | GEO Garner" };
 
 export default function PrivacyPage() {
   const { name, email } = operator();
   return (
     <LegalPage title="Privacy" updated={LEGAL_UPDATED}>
       <p>
-        GEO Score is run by {name}, the controller of the personal data described here. We collect as little as the service needs and never
+        GEO Garner is run by {name}, the controller of the personal data described here. We collect as little as the service needs and never
         sell it.
       </p>
 

@@ -4,7 +4,7 @@ import { Panel } from "@/components/panel";
 import { loginTokenUsable } from "@/lib/auth/session";
 import { paidPlan } from "@/lib/billing";
 
-export const metadata: Metadata = { title: "Sign in | GEO Score", robots: { index: false }, referrer: "same-origin" };
+export const metadata: Metadata = { title: "Sign in | GEO Garner", robots: { index: false }, referrer: "same-origin" };
 
 /** Landing page of the email link. It only spends the token on the button press (a POST), never on this GET. */
 export default async function VerifyPage({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<{ plan?: string }> }) {
@@ -20,7 +20,7 @@ export default async function VerifyPage({ params, searchParams }: { params: Pro
     );
   }
   return (
-    <Panel title="Sign in to GEO Score">
+    <Panel title="Sign in to GEO Garner">
       <form method="post" action="/api/auth/verify">
         <input type="hidden" name="token" value={token} />
         {paidPlan(plan) && <input type="hidden" name="plan" value={paidPlan(plan)!} />}

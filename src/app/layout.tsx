@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     // Absolute canonical and social URLs on the public domain (APP_URL), whatever host served the page.
     metadataBase: new URL(appUrl()),
-    title: "AI Visibility Checker: do AI assistants recommend your business? | GEO Score",
+    title: "AI Visibility Checker: do AI assistants recommend your business? | GEO Garner",
     description:
       "Free GEO (Generative Engine Optimization) check. See how often AI models mention and recommend your brand, who they recommend instead, and what to fix first.",
   };
@@ -32,7 +32,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
                   <path d="M12 12h8" />
                 </svg>
               </span>
-              GEO Score
+              GEO Garner
             </Link>
             <nav aria-label="Main" className="flex items-center gap-7 text-sm">
               <Link href="/#how" className="hidden text-muted-foreground hover:text-foreground sm:inline">How it works</Link>
@@ -60,7 +60,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <footer className="border-t print:hidden">
           <div className="mx-auto flex w-full max-w-6xl flex-wrap justify-between gap-4 px-4 py-8 text-sm text-muted-foreground sm:px-8">
             <span className="flex flex-wrap gap-x-5 gap-y-1">
-              <span>© {new Date().getFullYear()} GEO Score</span>
+              <span>© {new Date().getFullYear()} GEO Garner</span>
               <Link href="/pricing" className="hover:text-foreground">Pricing</Link>
               <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
               <Link href="/terms" className="hover:text-foreground">Terms</Link>

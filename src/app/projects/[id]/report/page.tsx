@@ -8,7 +8,7 @@ import { publicMessage } from "@/lib/errors";
 import { clientReport, type ClientReportSite } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Client report | GEO Score", robots: { index: false } };
+export const metadata: Metadata = { title: "Client report | GEO Garner", robots: { index: false } };
 
 export default async function ClientReportPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await currentUser();

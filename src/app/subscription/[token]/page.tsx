@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Panel } from "@/components/panel";
 import { findSubscription } from "@/lib/tracking";
 
-export const metadata: Metadata = { title: "Weekly tracking | GEO Score", robots: { index: false } };
+export const metadata: Metadata = { title: "Weekly tracking | GEO Garner", robots: { index: false } };
 
 export default async function SubscriptionPage({
   params,

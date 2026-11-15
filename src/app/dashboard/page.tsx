@@ -7,7 +7,7 @@ import { PLANS } from "@/lib/plans";
 import { analysesLast30Days, dashboard, type DashboardSite } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Dashboard | GEO Score", robots: { index: false } };
+export const metadata: Metadata = { title: "Dashboard | GEO Garner", robots: { index: false } };
 
 const input = "h-11 min-w-0 flex-1 rounded-xl border bg-background px-3.5 text-[15px] outline-none focus-visible:border-brand";
 const primary = "inline-flex h-11 shrink-0 items-center gap-2 rounded-xl bg-brand px-4 font-semibold text-brand-foreground hover:bg-brand/90";

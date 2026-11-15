@@ -7,7 +7,7 @@ import { currentUser } from "@/lib/auth/session";
 import { trackedWebsiteIds } from "@/lib/projects";
 import { turnstileSiteKey } from "@/lib/security/turnstile";
 
-export const metadata: Metadata = { title: "Your AI visibility report | GEO Score", robots: { index: false } };
+export const metadata: Metadata = { title: "Your AI visibility report | GEO Garner", robots: { index: false } };
 
 export default async function ReportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

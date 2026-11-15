@@ -92,9 +92,9 @@ describe("tracking emails", () => {
 
 describe("parseSender", () => {
   it("reads a named or bare sender", () => {
-    expect(parseSender("GEO Score <scores@geo.test>")).toEqual({ name: "GEO Score", email: "scores@geo.test" });
+    expect(parseSender("GEO Garner <scores@geo.test>")).toEqual({ name: "GEO Garner", email: "scores@geo.test" });
     expect(parseSender('"Ana" <ana@geo.test>')).toEqual({ name: "Ana", email: "ana@geo.test" });
-    expect(parseSender("scores@geo.test")).toEqual({ name: "GEO Score", email: "scores@geo.test" });
+    expect(parseSender("scores@geo.test")).toEqual({ name: "GEO Garner", email: "scores@geo.test" });
     expect(parseSender("")).toBeNull();
     expect(parseSender("not an email")).toBeNull();
   });

@@ -10,7 +10,7 @@ function layout(body: string, footer: string): string {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border:1px solid #e4e6eb;border-radius:16px">
 <tr><td style="padding:28px">
-<p style="margin:0 0 24px;font-size:15px;font-weight:600">GEO Score</p>
+<p style="margin:0 0 24px;font-size:15px;font-weight:600">GEO Garner</p>
 ${body}
 </td></tr></table>
 <p style="margin:16px 0 0;max-width:520px;font-size:12px;line-height:1.5;color:#5b6170">${footer}</p>
@@ -78,14 +78,14 @@ ${button(d.reportUrl, "See the full report")}`,
 export function loginEmail(p: { to: string; loginUrl: string; minutes: number }): OutgoingEmail {
   return {
     to: p.to,
-    subject: "Your GEO Score sign-in link",
+    subject: "Your GEO Garner sign-in link",
     html: layout(
-      `<h1 style="margin:0 0 12px;font-size:22px;line-height:1.25">Sign in to GEO Score</h1>
+      `<h1 style="margin:0 0 12px;font-size:22px;line-height:1.25">Sign in to GEO Garner</h1>
 <p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#4a5060">Click the button to sign in. The link works once and expires in ${p.minutes} minutes.</p>
 ${button(p.loginUrl, "Sign in")}`,
       "If you didn't ask to sign in, ignore this email: nobody can get in without this link.",
     ),
-    text: `Sign in to GEO Score (the link works once and expires in ${p.minutes} minutes):\n${p.loginUrl}\n\nIf you didn't ask to sign in, ignore this email.`,
+    text: `Sign in to GEO Garner (the link works once and expires in ${p.minutes} minutes):\n${p.loginUrl}\n\nIf you didn't ask to sign in, ignore this email.`,
   };
 }
 

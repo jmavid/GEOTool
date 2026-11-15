@@ -8,7 +8,7 @@ export function Panel({ title, children }: { title: string; children: React.Reac
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h1>
         {children}
         <Link href="/" className="text-sm text-foreground underline underline-offset-2">
-          Back to GEO Score
+          Back to GEO Garner
         </Link>
       </div>
     </div>

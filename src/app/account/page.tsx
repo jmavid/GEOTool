@@ -5,7 +5,7 @@ import { currentUser } from "@/lib/auth/session";
 import { billingConfigured } from "@/lib/billing";
 import { PLANS } from "@/lib/plans";
 
-export const metadata: Metadata = { title: "Account | GEO Score", robots: { index: false } };
+export const metadata: Metadata = { title: "Account | GEO Garner", robots: { index: false } };
 
 const button = "inline-flex h-11 items-center rounded-xl border bg-background px-4 font-medium hover:bg-muted";
 

@@ -1,4 +1,4 @@
-# GEO Score — PageSpeed Insights for AI visibility
+# GEO Garner — PageSpeed Insights for AI visibility
 
 Enter a URL → we read the site, write the questions real buyers ask ChatGPT, ask them, and return a
 **deterministic GEO Score (0-100)**, **AI share of voice** and **what to do next**.
@@ -215,7 +215,7 @@ needs the events `checkout.session.completed` and `customer.subscription.created
 portal (plan switching between the three prices). Locally: `stripe listen --forward-to localhost:3000/api/billing/webhook`.
 
 Sign-in and weekly tracking emails: onboard a sending domain in Cloudflare Email Service, then in `wrangler.jsonc` add
-`"send_email": [{ "name": "EMAIL" }]`, set `EMAIL_FROM` (e.g. `GEO Score <scores@yourdomain.com>`) and `APP_URL`, and
+`"send_email": [{ "name": "EMAIL" }]`, set `EMAIL_FROM` (e.g. `GEO Garner <scores@yourdomain.com>`) and `APP_URL`, and
 `npm run db:migrate:remote` + `npm run deploy`. With email on, `OWNER_NOTIFY_EMAIL` gets a summary of every analysis a
 client runs (site, score or error, plan, account or anonymous, models, AI cost); weekly re-checks don't send one.
 Queues and the CPU time of a 2-3 min

@@ -2,17 +2,17 @@ import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal-page";
 import { LEGAL_UPDATED, operator } from "@/lib/legal";
 
-export const metadata: Metadata = { title: "Terms | GEO Score" };
+export const metadata: Metadata = { title: "Terms | GEO Garner" };
 
 export default function TermsPage() {
   const { name, email } = operator();
   return (
     <LegalPage title="Terms" updated={LEGAL_UPDATED}>
-      <p>These terms cover your use of GEO Score, run by {name}. By using the service you accept them.</p>
+      <p>These terms cover your use of GEO Garner, run by {name}. By using the service you accept them.</p>
 
       <h2>The service</h2>
       <p>
-        GEO Score asks AI models questions a buyer might ask and reports how they mention and recommend a brand. AI answers vary from one run to the
+        GEO Garner asks AI models questions a buyer might ask and reports how they mention and recommend a brand. AI answers vary from one run to the
         next and can be wrong: treat scores and recommendations as guidance, not a guarantee of results.
       </p>
 
