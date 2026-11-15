@@ -33,7 +33,7 @@ Browser ◀─poll GET /api/analyses/:id (2.5s)                    │
 | `src/lib/analyzer/` | HTML parsing (cheerio/slim), page picking, robots/sitemap/llms.txt |
 | `src/lib/pipeline/` | profile, queries, detect (pure), analyze-response, score (pure), insights, run |
 | `src/lib/ai/` | Workers AI chat wrapper, JSON-mode helper with Zod + retry, D1-backed cache, cost tracker |
-| `src/providers/` | `workers-ai.ts` (active: one engine per model in `AI_VISIBILITY_MODELS`); `openai.ts`, `gemini.ts`, `claude.ts`, `perplexity.ts` prepared but off |
+| `src/providers/` | `workers-ai.ts` (one engine per model in `AI_VISIBILITY_MODELS`); `openai.ts` and `claude.ts` for paid plans once their keys are set; `gemini.ts`, `perplexity.ts` prepared but off |
 | `src/db/schema.ts` | Drizzle schema → `migrations/` (applied with wrangler) |
 | `src/lib/plans.ts` | Plan limits (FREE / STARTER / PRO / AGENCY) |
 
@@ -74,8 +74,23 @@ interface AIProvider {
 **What this measures:** how well open LLMs *know and recommend* the brand from their training data. These models
 don't search the web, so: (1) the report shows them by their real names, never as "ChatGPT"; (2) the Citations
 component is marked "not measured" and its 15% is redistributed proportionally; (3) very recent brands score low
-until they enter training data. Live assistants with web search (ChatGPT, Gemini, Claude, Perplexity) are written in
-`src/providers/` and can be switched on with `EXTERNAL_PROVIDERS=openai,...` plus their key, if you ever decide to.
+until they enter training data.
+
+**ChatGPT and Claude (paid plans):** live assistants with web search, so their answers can cite the brand's site.
+They run when listed in `EXTERNAL_PROVIDERS` (default `openai,claude`) and their key is set as a secret:
+
+```bash
+npx wrangler secret put OPENAI_API_KEY
+npx wrangler secret put ANTHROPIC_API_KEY
+```
+
+- Only analyses on the plans in `EXTERNAL_PROVIDER_PLANS` (default `STARTER,PRO,AGENCY`) include them; the free
+  check stays on Workers AI and its report says ChatGPT and Claude are on paid plans.
+- Each answers the first `EXTERNAL_PROMPTS_PER_ANALYSIS` questions (default 25); the rest go to the Workers AI
+  models only. Approximate cost per 25 questions: ChatGPT (`gpt-5-mini`) ~$0.37, Claude (`claude-haiku-5-5`) ~$0.28,
+  mostly the $10 per 1,000 web searches.
+- Models: `OPENAI_VISIBILITY_MODEL` and `CLAUDE_MODEL`. Claude answers at low effort with up to 2 searches, localized
+  to the brand's country. Gemini and Perplexity are written too (`src/providers/`) but untested.
 
 Model choice was tested on 2026-10-27 with real calls: gpt-oss-120b and DeepSeek V4.1 Flash answered in ~4s with
 good brand lists and valid JSON; Kimi K2.6 was good but ~3× slower; GLM-5.3-flash spent its whole budget reasoning

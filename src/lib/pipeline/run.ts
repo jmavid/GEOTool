@@ -6,7 +6,7 @@ import { CostTracker } from "@/lib/ai/cost";
 import { ANALYSIS_FAILED, publicMessage, UserError } from "@/lib/errors";
 import { promptsFor } from "@/lib/plans";
 import { notifySubscribers } from "@/lib/tracking";
-import { activeProviders } from "@/providers";
+import { activeProviders, EXTERNAL_PROVIDERS, externalPromptLimit } from "@/providers";
 import type { ProviderResult } from "@/providers/types";
 import { BrandRegistry, llmAnalyzeResponse, mergeVerdict } from "./analyze-response";
 import { makeBrandRef } from "./detect";
@@ -42,7 +42,7 @@ export async function runAnalysis(analysisId: string): Promise<void> {
   if (!website) return;
 
   try {
-    const providers = activeProviders();
+    const providers = activeProviders(analysis.plan);
     if (!providers.length) throw new UserError("No AI provider is configured yet.");
     await update({ status: "RUNNING", stage: "Reading your website", progress: 5 });
 
@@ -84,7 +84,11 @@ export async function runAnalysis(analysisId: string): Promise<void> {
     const target = makeBrandRef(profile.brand, profile.brandAliases, snapshot.facts.domain);
     const competitorRefs = profile.competitors.map((c) => makeBrandRef(c.name, [], c.domain));
     const registry = new BrandRegistry(target, competitorRefs);
-    const jobs = providers.flatMap((provider) => prompts.map((prompt) => ({ provider, prompt })));
+    // Commercial assistants answer only the first questions: they search the web and cost far more per answer.
+    const external = new Set(EXTERNAL_PROVIDERS.map((p) => p.id));
+    const jobs = providers.flatMap((provider) =>
+      (external.has(provider.id) ? prompts.slice(0, externalPromptLimit()) : prompts).map((prompt) => ({ provider, prompt })),
+    );
     const country = profile.countryCode ?? undefined;
     let done = 0;
     let failures = 0;

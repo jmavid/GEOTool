@@ -13,7 +13,7 @@ import { UserError } from "@/lib/errors";
 import type { User } from "@/lib/auth/session";
 import { planLimitError, promptsFor } from "@/lib/plans";
 import { analysesLast30Days, attachWebsite, defaultProjectId, ownedProject, trackedWebsiteIds } from "@/lib/projects";
-import { EXTERNAL_PROVIDERS } from "@/providers";
+import { connectedExternalProviders, EXTERNAL_PROVIDERS, externalProvidersIncluded } from "@/providers";
 
 const DEDUPE_WINDOW_MS = 24 * 3_600_000;
 const STALE_MS = 15 * 60_000;
@@ -148,6 +148,7 @@ export async function getReport(id: string) {
     }),
   ]);
 
+  const connected = new Set(connectedExternalProviders().map((p) => p.id));
   const providerScores = (analysis.providerScores ?? {}) as Record<string, { name?: string; mentionRate: number; responses: number; browses?: boolean }>;
   const insights = analysis.insights as { reasons: { title: string; detail: string }[]; evidence: Evidence } | null;
 
@@ -158,8 +159,15 @@ export async function getReport(id: string) {
       breakdown: analysis.scoreBreakdown as GeoScore,
       // Engines actually tested first, then the commercial assistants that are not connected.
       providers: [
-        ...Object.entries(providerScores).map(([id, p]) => ({ id, name: p.name ?? id, mentionRate: p.mentionRate as number | null, tested: true })),
-        ...EXTERNAL_PROVIDERS.filter((p) => !providerScores[p.id]).map((p) => ({ id: p.id, name: p.name, mentionRate: null, tested: false })),
+        ...Object.entries(providerScores).map(([id, p]) => ({ id, name: p.name ?? id, mentionRate: p.mentionRate as number | null, tested: true, paidOnly: false })),
+        ...EXTERNAL_PROVIDERS.filter((p) => !providerScores[p.id]).map((p) => ({
+          id: p.id,
+          name: p.name,
+          mentionRate: null,
+          tested: false,
+          // Connected but left out because of this analysis's plan: a paid-plan feature, not a missing integration.
+          paidOnly: connected.has(p.id) && !externalProvidersIncluded(analysis.plan),
+        })),
       ],
       competitors: competitors.map((c) => ({ name: c.name, domain: c.domain, isTarget: c.isTarget, mentions: c.mentions, share: c.shareOfVoice })),
       reasons: insights?.reasons ?? [],

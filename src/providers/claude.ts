@@ -1,51 +1,77 @@
-import type { AIProvider, Citation, ProviderResult } from "./types";
+import Anthropic from "@anthropic-ai/sdk";
+import type { AIProvider, Citation, ExecuteOptions, ProviderResult } from "./types";
 import { SYSTEM_PROMPT, uniqueCitations } from "./types";
 
-interface ClaudeResponse {
-  model?: string;
-  content?: { type: string; text?: string; citations?: { url?: string; title?: string }[] }[];
-  usage?: { input_tokens?: number; output_tokens?: number; server_tool_use?: { web_search_requests?: number } };
+let client: Anthropic | null = null;
+function anthropic(): Anthropic {
+  if (!process.env.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not set");
+  client ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 90_000, maxRetries: 2 });
+  return client;
 }
 
-/** Prepared, untested without a key: Claude Messages API with the server-side web search tool. */
+/** The dynamic-filtering web search needs Sonnet/Opus/Fable-class models; Haiku keeps the basic tool. */
+export function webSearchTool(model: string, country?: string): Anthropic.Messages.ToolUnion {
+  const user_location = country ? { type: "approximate" as const, country } : undefined;
+  return /^claude-haiku/.test(model)
+    ? { type: "web_search_20250305", name: "web_search", max_uses: 2, user_location }
+    : { type: "web_search_20260209", name: "web_search", max_uses: 2, user_location };
+}
+
+/** Text and cited URLs from a Messages response. Pure, so it is unit-tested. */
+export function readClaudeContent(content: Anthropic.Messages.ContentBlock[]): { text: string; citations: Citation[] } {
+  const citations: Citation[] = [];
+  let text = "";
+  for (const block of content) {
+    if (block.type !== "text") continue;
+    text += block.text;
+    for (const c of block.citations ?? []) {
+      if (c.type === "web_search_result_location") citations.push({ url: c.url, title: c.title ?? undefined });
+    }
+  }
+  return { text: text.trim(), citations: uniqueCitations(citations) };
+}
+
+/** "Claude" as a buyer experiences it in claude.ai: a chat answer with web search, localized to the market. */
 export const claudeProvider: AIProvider = {
   id: "claude",
   name: "Claude",
   browses: true,
   get model() {
-    return process.env.CLAUDE_MODEL ?? "claude-sonnet-5-5";
+    return process.env.CLAUDE_MODEL ?? "claude-haiku-5-5";
   },
   isConfigured: () => !!process.env.ANTHROPIC_API_KEY,
-  async executePrompt(prompt): Promise<ProviderResult> {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY!,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: this.model,
-        max_tokens: 2048,
+  async executePrompt(prompt: string, options: ExecuteOptions = {}): Promise<ProviderResult> {
+    const model = this.model;
+    const country = options.country && /^[A-Z]{2}$/.test(options.country) ? options.country : undefined;
+    const tools = [webSearchTool(model, country)];
+    const messages: Anthropic.Messages.MessageParam[] = [{ role: "user", content: prompt }];
+    const content: Anthropic.Messages.ContentBlock[] = [];
+    const usage = { inputTokens: 0, outputTokens: 0, webSearchCalls: 0 };
+    let served = model;
+
+    // The server-side search loop can pause; resending the turn resumes it. Capped so a stuck turn can't loop.
+    for (let turn = 0; turn < 3; turn++) {
+      const res = await anthropic().messages.create({
+        model,
+        max_tokens: 8_000,
         system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: prompt }],
-        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 2 }],
-      }),
-      signal: AbortSignal.timeout(90_000),
-    });
-    if (!res.ok) throw new Error(`Claude HTTP ${res.status}`);
-    const data = (await res.json()) as ClaudeResponse;
-    const textBlocks = (data.content ?? []).filter((b) => b.type === "text");
-    const citations: Citation[] = textBlocks.flatMap((b) => (b.citations ?? []).map((c) => ({ url: c.url ?? "", title: c.title })));
-    return {
-      text: textBlocks.map((b) => b.text ?? "").join(""),
-      citations: uniqueCitations(citations),
-      model: data.model ?? this.model,
-      usage: {
-        inputTokens: data.usage?.input_tokens ?? 0,
-        outputTokens: data.usage?.output_tokens ?? 0,
-        webSearchCalls: data.usage?.server_tool_use?.web_search_requests ?? 0,
-      },
-    };
+        // A quick consumer-style answer, not a deep research pass.
+        output_config: { effort: "low" },
+        messages,
+        tools,
+      });
+      served = res.model;
+      usage.inputTokens += res.usage.input_tokens + (res.usage.cache_read_input_tokens ?? 0) + (res.usage.cache_creation_input_tokens ?? 0);
+      usage.outputTokens += res.usage.output_tokens;
+      usage.webSearchCalls += res.usage.server_tool_use?.web_search_requests ?? 0;
+      content.push(...res.content);
+      if (res.stop_reason === "refusal") throw new Error(`Claude declined to answer (${res.stop_details?.category ?? "no category"})`);
+      if (res.stop_reason !== "pause_turn") break;
+      messages.splice(1, messages.length - 1, { role: "assistant", content: content as Anthropic.Messages.ContentBlockParam[] });
+    }
+
+    const { text, citations } = readClaudeContent(content);
+    if (!text) throw new Error(`${model} returned an empty answer`);
+    return { text, citations, model: served, usage };
   },
 };

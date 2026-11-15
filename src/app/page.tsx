@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowRight, Check, ChevronDown, Gauge, ListChecks, MessageSquareText, ChartColumn } from "lucide-react";
 import { UrlForm } from "@/components/url-form";
 import { turnstileSiteKey } from "@/lib/security/turnstile";
-import { activeProviders, EXTERNAL_PROVIDERS } from "@/providers";
+import { activeProviders, connectedExternalProviders, EXTERNAL_PROVIDERS, externalPromptLimit } from "@/providers";
 import { PLANS, promptsFor } from "@/lib/plans";
 
 const PAID = ["STARTER", "PRO", "AGENCY"] as const;
@@ -22,8 +22,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
   await connection(); // read the Turnstile key and model list at request time, not at build time
   const { deleted } = await searchParams;
   const siteKey = turnstileSiteKey();
-  const tested = activeProviders();
-  const comingSoon = EXTERNAL_PROVIDERS.filter((p) => !tested.some((t) => t.id === p.id)).map((p) => p.name);
+  const tested = activeProviders("FREE");
+  const connected = connectedExternalProviders();
+  // Connected assistants the free check doesn't include are a paid-plan feature, the rest are not live yet.
+  const paidOnly = connected.filter((p) => !tested.some((t) => t.id === p.id)).map((p) => p.name);
+  const comingSoon = EXTERNAL_PROVIDERS.filter((p) => !connected.some((c) => c.id === p.id)).map((p) => p.name);
   const testedNames = tested.map((p) => p.name);
   const questions = promptsFor("FREE");
 
@@ -31,7 +34,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
     ["What is GEO?", "Generative Engine Optimization: making sure AI assistants know your brand and recommend it when buyers ask for options. It is SEO for answers instead of links."],
     [
       "Which AI models do you test?",
-      `Today: ${listify(testedNames)}.${comingSoon.length ? ` ${listify(comingSoon)} ${comingSoon.length > 1 ? "are" : "is"} coming soon.` : ""} Your report always says which models answered.`,
+      `The free check: ${listify(testedNames)}.${paidOnly.length ? ` Paid plans add ${listify(paidOnly)}, with web search, on up to ${externalPromptLimit()} questions per analysis.` : ""}${comingSoon.length ? ` ${listify(comingSoon)} ${comingSoon.length > 1 ? "are" : "is"} coming soon.` : ""} Your report always says which models answered.`,
     ],
     [
       "How is the score calculated?",
@@ -71,6 +74,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
                   {name}
                 </span>
               ))}
+              {paidOnly.length > 0 && (
+                <span className="inline-flex h-[30px] items-center rounded-lg border border-dashed border-foreground/20 px-3 text-[13px] text-muted-foreground">
+                  {paidOnly.join(" · ")}: paid plans
+                </span>
+              )}
               {comingSoon.length > 0 && (
                 <span className="inline-flex h-[30px] items-center rounded-lg border border-dashed border-foreground/20 px-3 text-[13px] text-muted-foreground">
                   {comingSoon.join(" · ")}: coming soon

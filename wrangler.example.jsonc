@@ -41,7 +41,12 @@
     // Comma-separated Workers AI models asked the buyer questions (each one is an "engine" in the report).
     "AI_VISIBILITY_MODELS": "@cf/openai/gpt-oss-120b,@cf/deepseek-ai/deepseek-v4.1-flash-1017",
     // External assistants (openai,gemini,claude,perplexity) stay off unless listed here AND their key is set.
-    "EXTERNAL_PROVIDERS": "",
+    "EXTERNAL_PROVIDERS": "openai,claude",
+    // Plans whose analyses include them, and how many questions per analysis they answer (they search the web).
+    "EXTERNAL_PROVIDER_PLANS": "STARTER,PRO,AGENCY",
+    "EXTERNAL_PROMPTS_PER_ANALYSIS": "25",
+    "OPENAI_VISIBILITY_MODEL": "gpt-5-mini",
+    "CLAUDE_MODEL": "claude-haiku-5-5",
     "FREE_ANALYSES_PER_IP_PER_DAY": "3",
     // Global cap on new analyses per 24h (Workers AI budget guard).
     "MAX_ANALYSES_PER_DAY": "100",

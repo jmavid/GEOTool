@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { ArrowRight, Check, ChevronDown, CircleAlert, Link as LinkIcon, RotateCcw, X } from "lucide-react";
 import type { Report } from "@/lib/analyses";
 import { UrlForm } from "@/components/url-form";
@@ -186,7 +187,8 @@ function Completed({ report, result, viewer }: { report: Report; result: Result;
   const leader = result.competitors.find((c) => !c.isTarget);
   const providerNames = Object.fromEntries(result.providers.map((p) => [p.id, p.name]));
   const tested = result.providers.filter((p) => p.tested);
-  const untested = result.providers.filter((p) => !p.tested);
+  const paidOnly = result.providers.filter((p) => !p.tested && p.paidOnly);
+  const untested = result.providers.filter((p) => !p.tested && !p.paidOnly);
   const positions = result.queries.flatMap((q) => q.results.map((r) => r.position)).filter((p): p is number => p !== null);
   const avgPosition = positions.length ? positions.reduce((a, b) => a + b, 0) / positions.length : null;
   const pct = (n: number) => (t.responses ? Math.round((n / t.responses) * 100) : 0);
@@ -313,6 +315,18 @@ function Completed({ report, result, viewer }: { report: Report; result: Result;
               );
             })}
           </div>
+          {paidOnly.length > 0 && (
+            <p className="mt-4 flex items-start gap-2 rounded-xl border border-dashed border-foreground/20 px-3.5 py-3 text-[13px] text-muted-foreground">
+              <CircleAlert className="mt-px size-4 shrink-0" aria-hidden />
+              <span>
+                {paidOnly.map((p) => p.name).join(" and ")} answers, with web search, are included on{" "}
+                <Link href="/pricing" className="font-medium text-foreground underline underline-offset-2">
+                  paid plans
+                </Link>
+                . This score only reflects the models above.
+              </span>
+            </p>
+          )}
           {untested.length > 0 && (
             <p className="mt-4 flex items-start gap-2 rounded-xl border border-dashed border-foreground/20 px-3.5 py-3 text-[13px] text-muted-foreground">
               <CircleAlert className="mt-px size-4 shrink-0" aria-hidden />
