@@ -2,17 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { currentUser } from "@/lib/auth/session";
-import { funnelSince, isOwner } from "@/lib/funnel";
+import { funnelSince, ownerRequest } from "@/lib/funnel";
 
 export const metadata: Metadata = { title: "Funnel | GEO Garner", robots: { index: false } };
 
 const PERIODS = [7, 30, 90] as const;
 const pct = (v: number | null) => (v === null ? "–" : `${Math.round(v * 100)}%`);
 
-/** The owner's view of the funnel: analysis launched → finished → email → account → paid. Visits live in Web Analytics. */
+/** The owner's view (owner's email or own IPs) of the funnel: analysis launched → finished → email → account → paid. Visits live in Web Analytics. */
 export default async function FunnelPage({ searchParams }: { searchParams: Promise<{ days?: string }> }) {
   const user = await currentUser();
-  if (!user || !isOwner(user.email)) notFound();
+  if (!(await ownerRequest(user?.email))) notFound();
   const requested = Number((await searchParams).days);
   const days = PERIODS.find((p) => p === requested) ?? 30;
   const steps = await funnelSince(days);

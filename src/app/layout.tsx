@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { currentUser } from "@/lib/auth/session";
-import { isOwner } from "@/lib/funnel";
+import { ownerRequest } from "@/lib/funnel";
 import { appUrl } from "@/lib/tracking";
 import "./globals.css";
 
@@ -21,6 +21,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const user = await currentUser();
+  const owner = await ownerRequest(user?.email);
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col bg-background font-sans text-foreground">
@@ -36,14 +37,16 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               GEO Garner
             </Link>
             <nav aria-label="Main" className="flex items-center gap-7 text-sm">
+              {owner && (
+                <Link href="/admin/funnel" className="font-medium text-brand hover:underline">
+                  Funnel
+                </Link>
+              )}
               <Link href="/#how" className="hidden text-muted-foreground hover:text-foreground sm:inline">How it works</Link>
               <Link href="/#report" className="hidden text-muted-foreground hover:text-foreground sm:inline">What you get</Link>
               <Link href="/pricing" className="hidden text-muted-foreground hover:text-foreground sm:inline">Pricing</Link>
               {user ? (
                 <>
-                  {isOwner(user.email) && (
-                    <Link href="/admin/funnel" className="hidden text-muted-foreground hover:text-foreground sm:inline">Funnel</Link>
-                  )}
                   <Link href="/account" className="hidden text-muted-foreground hover:text-foreground sm:inline">Account</Link>
                   <Link href="/dashboard" className="inline-flex h-10 items-center rounded-lg bg-foreground px-4 font-medium text-background hover:bg-foreground/85">
                     Dashboard

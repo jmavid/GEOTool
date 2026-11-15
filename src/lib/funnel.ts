@@ -1,6 +1,7 @@
 import { and, countDistinct, eq, gte, inArray, ne, notInArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { hashIp } from "@/lib/security/rate-limit";
+import { headers } from "next/headers";
+import { hashIp, unlimitedIp } from "@/lib/security/rate-limit";
 
 export interface FunnelStep {
   key: string;
@@ -36,6 +37,17 @@ export function ownerIpHashes(): string[] {
 export function isOwner(email: string | null | undefined): boolean {
   const owner = process.env.OWNER_NOTIFY_EMAIL?.trim().toLowerCase();
   return !!owner && !!email && email.trim().toLowerCase() === owner;
+}
+
+/**
+ * Whether this request is the owner's: signed in with the owner's email, or coming from one of the owner's own IPs
+ * (UNLIMITED_IPS), so the funnel opens without signing in.
+ */
+export async function ownerRequest(email: string | null | undefined): Promise<boolean> {
+  if (isOwner(email)) return true;
+  const h = await headers();
+  const ip = h.get("cf-connecting-ip") ?? h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "";
+  return unlimitedIp(ip);
 }
 
 /** Funnel for visitors who arrived in the last `days` days, leaving out the owner's own IPs and email. */
