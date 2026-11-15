@@ -27,11 +27,11 @@ export function requestMeta(req: Request): RequestMeta {
  */
 export async function notifyOwner(analysisId: string, meta?: RequestMeta, opts: { reused?: boolean } = {}): Promise<void> {
   const to = process.env.OWNER_NOTIFY_EMAIL?.trim();
-  if (!to) return;
+  if (!to) return console.warn(`[analysis ${analysisId}] owner email skipped: OWNER_NOTIFY_EMAIL is not set`);
   try {
     const db = getDb();
     const analysis = await db.query.analyses.findFirst({ where: eq(schema.analyses.id, analysisId) });
-    if (!analysis || analysis.trigger !== "USER") return;
+    if (!analysis || analysis.trigger !== "USER") return console.info(`[analysis ${analysisId}] owner email skipped: not a client run`);
     if (!opts.reused && analysis.status !== "COMPLETED" && analysis.status !== "FAILED") return;
     const website = await db.query.websites.findFirst({ where: eq(schema.websites.id, analysis.websiteId) });
     const user = analysis.userId ? await db.query.users.findFirst({ where: eq(schema.users.id, analysis.userId) }) : null;
@@ -58,7 +58,8 @@ export async function notifyOwner(analysisId: string, meta?: RequestMeta, opts: 
         at: new Date(),
       }),
     );
-    if (!sent) console.warn(`[analysis ${analysisId}] owner email not sent`);
+    if (sent) console.info(`[analysis ${analysisId}] owner email sent (${opts.reused ? "reused report" : analysis.status})`);
+    else console.warn(`[analysis ${analysisId}] owner email not sent`);
   } catch (err) {
     console.error(`[analysis ${analysisId}] owner email failed:`, err);
   }

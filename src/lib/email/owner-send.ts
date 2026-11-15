@@ -50,7 +50,10 @@ export function buildMime(msg: OutgoingEmail, from: { name: string; email: strin
 export async function sendOwnerEmail(msg: OutgoingEmail): Promise<boolean> {
   const binding = ownerBinding();
   const from = parseSender(process.env.OWNER_EMAIL_FROM ?? "");
-  if (!binding || !from) return sendEmail(msg);
+  if (!binding || !from) {
+    console.warn(`[email] owner notification: ${binding ? "OWNER_EMAIL_FROM is invalid" : "no OWNER_EMAIL binding"}, using the EMAIL binding`);
+    return sendEmail(msg);
+  }
   try {
     // Email Routing takes a raw MIME EmailMessage. "cloudflare:email" only exists in the Workers runtime, so it is
     // loaded at run time and left out of the Next.js bundle.
