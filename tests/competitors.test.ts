@@ -17,6 +17,25 @@ describe("competitor extraction", () => {
     expect(reg.canonical("Facturalia")).toBeNull();
   });
 
+  it("merges short and long names of the same brand", () => {
+    const reg = new BrandRegistry(makeBrandRef("Plausible Analytics", ["Plausible"], "plausible.io"), [
+      makeBrandRef("Fathom Analytics", [], "usefathom.com"),
+      makeBrandRef("Sage Business Cloud", [], "sage.com"),
+      makeBrandRef("Simple Analytics", [], "simpleanalytics.com"),
+    ]);
+    expect(reg.canonical("Fathom")).toBe("Fathom Analytics");
+    expect(reg.canonical("Sage")).toBe("Sage Business Cloud");
+    expect(reg.canonical("Google Analytics 4")).toBe("Google Analytics 4");
+    expect(reg.canonical("Google Analytics")).toBe("Google Analytics 4");
+    // A different brand that only shares a descriptor stays separate.
+    expect(reg.canonical("Mixpanel Analytics")).toBe("Mixpanel Analytics");
+  });
+
+  it("detects a brand by its domain core in the answer text", () => {
+    const fathom = makeBrandRef("Fathom Analytics", [], "usefathom.com");
+    expect(fathom.variants).toContain("fathom");
+  });
+
   it("merges literal detection with the LLM pass", () => {
     const answer = "1. Holded – complete ERP\n2. Billin – simple invoicing\n3. Quipu";
     const llm: ResponseAnalysis = {

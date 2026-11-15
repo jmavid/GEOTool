@@ -2,7 +2,7 @@ import { z } from "zod";
 import { generateJson } from "@/lib/ai/llm";
 import { clipped, upTo } from "@/lib/ai/json";
 import type { CostTracker } from "@/lib/ai/cost";
-import { detectInResponse, findMention, normalizeText, type BrandRef } from "./detect";
+import { detectInResponse, findMention, nameCore, normalizeText, type BrandRef } from "./detect";
 
 const SENTIMENTS = ["positive", "neutral", "negative"] as const;
 
@@ -62,9 +62,13 @@ export class BrandRegistry {
     const n = normalizeText(name);
     if (!n || n.replace(/ /g, "").length < 2) return null;
     if (this.isTarget(name)) return null;
-    const known = this.known.find((k) => k.variants.includes(n) || k.variants.includes(n.replace(/ /g, "")) || findMention(n, k.variants) === 0);
+    const known =
+      this.known.find((k) => k.variants.includes(n) || k.variants.includes(n.replace(/ /g, "")) || findMention(n, k.variants) === 0) ??
+      // "Fathom" for a known "Fathom Analytics", "Sage" for "Sage Business Cloud".
+      this.known.find((k) => nameCore(k.name) === (nameCore(name) ?? n));
     if (known) return known.name;
-    const key = n.replace(/ /g, "");
+    // Spellings of the same new brand share a key: "Google Analytics 4" and "Google Analytics".
+    const key = (nameCore(name.replace(/\s+v?\d+(\.\d+)*$/i, "")) ?? n).replace(/ /g, "");
     if (!this.byKey.has(key)) this.byKey.set(key, name.trim());
     return this.byKey.get(key)!;
   }

@@ -60,7 +60,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
           </p>
           <div id="check" className="mt-2 scroll-mt-24">
             <UrlForm turnstileSiteKey={siteKey} />
-            <p className="mt-2.5 text-[13px] text-muted-foreground">1–3 minutes · {questions} real buyer questions · a report link you can share</p>
+            <p className="mt-2.5 text-[13px] text-muted-foreground">3–8 minutes · {questions} real buyer questions · a report link you can share</p>
           </div>
           <div className="flex flex-col gap-2.5 border-t pt-5">
             <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">Models tested today</p>

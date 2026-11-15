@@ -44,14 +44,35 @@ function domainLabel(domain: string): string {
   return parts.length >= 2 ? parts[parts.length - 2] : parts[0];
 }
 
+/** Domain label without the marketing prefixes/suffixes brands add when the plain name was taken: usefathom -> fathom. */
+export function domainCore(domain: string): string {
+  const label = domainLabel(domain).toLowerCase();
+  const core = label.replace(/^(use|get|try|join|go|hello|with|my)(?=[a-z]{4,}$)/, "").replace(/(?<=^[a-z]{4,})(hq|app)$/, "");
+  return core;
+}
+
+/** Words a brand name often carries after its distinctive part: "Sage Business Cloud", "QuickBooks Online". */
+const DESCRIPTOR_WORDS = new Set([
+  "analytics", "software", "app", "apps", "cloud", "online", "platform", "suite", "crm", "erp", "hq", "io",
+  "business", "tool", "tools", "pro", "web", "digital", "solutions", "labs", "ai",
+]);
+
+/** Normalized name without trailing descriptor words, or null when nothing distinctive (4+ chars) is left. */
+export function nameCore(name: string): string | null {
+  const words = stripLegalSuffix(normalizeText(name)).split(" ");
+  while (words.length > 1 && DESCRIPTOR_WORDS.has(words[words.length - 1])) words.pop();
+  const core = words.join(" ");
+  return core.replace(/ /g, "").length >= 4 ? core : null;
+}
+
 /**
  * All normalized spellings we accept for a brand: original, without legal suffix,
- * camelCase split ("HubSpot" -> "hub spot"), compact ("hub spot" -> "hubspot"), domain label.
+ * camelCase split ("HubSpot" -> "hub spot"), compact ("hub spot" -> "hubspot"), domain label and its core.
  * Variants shorter than 3 chars are dropped to avoid false positives.
  */
 export function buildBrandVariants(name: string, aliases: string[] = [], domain?: string | null): string[] {
   const raw = [name, ...aliases];
-  if (domain) raw.push(domainLabel(domain), domain.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0]);
+  if (domain) raw.push(domainLabel(domain), domainCore(domain), domain.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0]);
   const out = new Set<string>();
   for (const r of raw) {
     if (!r) continue;
