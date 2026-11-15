@@ -51,7 +51,7 @@ export default function PrivacyPage() {
       <p>The AI models are only sent public information about websites, never your email or payment details.</p>
 
       <h2>Cookies</h2>
-      <p>One strictly necessary cookie keeps you signed in, and another remembers that you gave your email for reports. Turnstile may set its own to check you&apos;re human. No analytics or advertising cookies.</p>
+      <p>One strictly necessary cookie keeps you signed in, and another remembers that you gave your email for reports. Turnstile may set its own to check you&apos;re human. No analytics or advertising cookies: visits are counted with Cloudflare Web Analytics, which sets no cookies and doesn&apos;t track you across sites.</p>
 
       <h2>How long we keep it</h2>
       <p>

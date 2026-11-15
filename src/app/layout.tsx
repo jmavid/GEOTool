@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { currentUser } from "@/lib/auth/session";
+import { isOwner } from "@/lib/funnel";
 import { appUrl } from "@/lib/tracking";
 import "./globals.css";
 
@@ -40,6 +41,9 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               <Link href="/pricing" className="hidden text-muted-foreground hover:text-foreground sm:inline">Pricing</Link>
               {user ? (
                 <>
+                  {isOwner(user.email) && (
+                    <Link href="/admin/funnel" className="hidden text-muted-foreground hover:text-foreground sm:inline">Funnel</Link>
+                  )}
                   <Link href="/account" className="hidden text-muted-foreground hover:text-foreground sm:inline">Account</Link>
                   <Link href="/dashboard" className="inline-flex h-10 items-center rounded-lg bg-foreground px-4 font-medium text-background hover:bg-foreground/85">
                     Dashboard
