@@ -216,7 +216,8 @@ portal (plan switching between the three prices). Locally: `stripe listen --forw
 
 Sign-in and weekly tracking emails: onboard a sending domain in Cloudflare Email Service, then in `wrangler.jsonc` add
 `"send_email": [{ "name": "EMAIL" }]`, set `EMAIL_FROM` (e.g. `GEO Score <scores@yourdomain.com>`) and `APP_URL`, and
-`npm run db:migrate:remote` + `npm run deploy`.
+`npm run db:migrate:remote` + `npm run deploy`. With email on, `OWNER_NOTIFY_EMAIL` gets a summary of every analysis a
+client runs (site, score or error, plan, account or anonymous, models, AI cost); weekly re-checks don't send one.
 Queues and the CPU time of a 2-3 min
 analysis need the Workers Paid plan.
 

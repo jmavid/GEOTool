@@ -5,6 +5,7 @@ import { cached, cacheKey } from "@/lib/ai/cache";
 import { CostTracker } from "@/lib/ai/cost";
 import { ANALYSIS_FAILED, publicMessage, UserError } from "@/lib/errors";
 import { promptsFor } from "@/lib/plans";
+import { notifyOwner } from "@/lib/owner-notify";
 import { notifySubscribers } from "@/lib/tracking";
 import { activeProviders, EXTERNAL_PROVIDERS, externalPromptLimit } from "@/providers";
 import type { ProviderResult } from "@/providers/types";
@@ -186,8 +187,11 @@ export async function runAnalysis(analysisId: string): Promise<void> {
   } catch (err) {
     console.error(`[analysis ${analysisId}] failed:`, err);
     await update({ status: "FAILED", error: publicMessage(err, ANALYSIS_FAILED), ...costFields() }).catch(() => {});
+    await notifyOwner(analysisId);
     return;
   }
+
+  await notifyOwner(analysisId);
 
   // Outside the try: a mail failure must never mark a finished analysis as FAILED.
   if (analysis.trigger === "SCHEDULED") {

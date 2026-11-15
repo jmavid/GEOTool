@@ -88,3 +88,47 @@ ${button(p.loginUrl, "Sign in")}`,
     text: `Sign in to GEO Score (the link works once and expires in ${p.minutes} minutes):\n${p.loginUrl}\n\nIf you didn't ask to sign in, ignore this email.`,
   };
 }
+
+export interface OwnerAnalysisData {
+  to: string;
+  domain: string;
+  reportUrl: string;
+  status: "COMPLETED" | "FAILED";
+  score: number | null;
+  error: string | null;
+  plan: string;
+  /** The client's account email, or null for an anonymous free check. */
+  account: string | null;
+  engines: string[];
+  costUsd: number;
+  seconds: number | null;
+}
+
+/** To the site owner: a client just ran an analysis. Nothing here is shown to the client. */
+export function ownerAnalysisEmail(d: OwnerAnalysisData): OutgoingEmail {
+  const who = d.account ?? "anonymous visitor";
+  const outcome = d.status === "COMPLETED" ? `${d.score ?? 0}/100` : "failed";
+  const rows: [string, string][] = [
+    ["Website", d.domain],
+    ["Result", d.status === "COMPLETED" ? `GEO Score ${d.score ?? 0}/100` : `Failed: ${d.error ?? "unknown error"}`],
+    ["Client", who],
+    ["Plan", d.plan],
+    ["Models", d.engines.join(", ") || "none"],
+    ["AI cost", `$${d.costUsd.toFixed(3)}`],
+    ["Time", d.seconds !== null ? `${Math.round(d.seconds)} s` : "n/a"],
+  ];
+  const table = rows
+    .map(([k, v]) => `<tr><td style="padding:4px 16px 4px 0;color:#5b6170">${escapeHtml(k)}</td><td style="padding:4px 0;color:#0b0d12">${escapeHtml(v)}</td></tr>`)
+    .join("");
+  return {
+    to: d.to,
+    subject: `New analysis: ${d.domain} · ${outcome} (${d.plan}, ${who})`,
+    html: layout(
+      `<h1 style="margin:0 0 16px;font-size:20px">New analysis: ${escapeHtml(d.domain)}</h1>
+<table style="border-collapse:collapse;font-size:14px;line-height:1.5;margin:0 0 24px">${table}</table>
+${button(d.reportUrl, "Open the report")}`,
+      "You get this for every analysis a client runs (OWNER_NOTIFY_EMAIL).",
+    ),
+    text: [...rows.map(([k, v]) => `${k}: ${v}`), `Report: ${d.reportUrl}`].join("\n"),
+  };
+}
