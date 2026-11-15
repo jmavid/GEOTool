@@ -5,7 +5,7 @@ import { UserError } from "@/lib/errors";
 import { field, formRoute } from "@/lib/form-route";
 import { planLimitError } from "@/lib/plans";
 import { attachWebsite, defaultProjectId, trackedWebsiteIds } from "@/lib/projects";
-import { clientIp } from "@/lib/security/rate-limit";
+import { requestMeta } from "@/lib/owner-notify";
 
 /**
  * Add a website to a project. From the dashboard (url): runs, or reuses today's, analysis. From a report (analysisId):
@@ -26,6 +26,6 @@ export const POST = formRoute("/dashboard", async (user, form, req) => {
   }
   const url = field(form, "url");
   if (!url || url.length > 2048) throw new UserError("Enter a website URL.");
-  const { id } = await createAnalysis(url, clientIp(req), user, field(form, "projectId") || undefined);
+  const { id } = await createAnalysis(url, requestMeta(req), user, field(form, "projectId") || undefined);
   return `/report/${id}`;
 });

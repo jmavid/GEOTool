@@ -92,39 +92,58 @@ ${button(p.loginUrl, "Sign in")}`,
 export interface OwnerAnalysisData {
   to: string;
   domain: string;
+  url: string;
   reportUrl: string;
-  status: "COMPLETED" | "FAILED";
+  /** COMPLETED / FAILED for a new run; any status for a reused report. */
+  status: string;
+  /** An existing recent report was shown instead of running a new analysis. */
+  reused: boolean;
   score: number | null;
   error: string | null;
   plan: string;
   /** The client's account email, or null for an anonymous free check. */
   account: string | null;
+  ip: string | null;
+  country: string | null;
+  userAgent: string | null;
   engines: string[];
   costUsd: number;
   seconds: number | null;
+  at: Date;
 }
 
-/** To the site owner: a client just ran an analysis. Nothing here is shown to the client. */
+function ownerResult(d: OwnerAnalysisData): string {
+  if (d.status === "COMPLETED") return `GEO Score ${d.score ?? 0}/100`;
+  if (d.status === "FAILED") return `Failed: ${d.error ?? "unknown error"}`;
+  return "Still running";
+}
+
+/** To the site owner: a client just asked for an analysis. Nothing here is shown to the client. */
 export function ownerAnalysisEmail(d: OwnerAnalysisData): OutgoingEmail {
   const who = d.account ?? "anonymous visitor";
-  const outcome = d.status === "COMPLETED" ? `${d.score ?? 0}/100` : "failed";
+  const outcome = d.status === "COMPLETED" ? `${d.score ?? 0}/100` : d.status === "FAILED" ? "failed" : "running";
   const rows: [string, string][] = [
-    ["Website", d.domain],
-    ["Result", d.status === "COMPLETED" ? `GEO Score ${d.score ?? 0}/100` : `Failed: ${d.error ?? "unknown error"}`],
+    ["Website", d.url || d.domain],
+    ["Run", d.reused ? "Reused a recent report (no new AI calls)" : "New analysis"],
+    ["Result", ownerResult(d)],
     ["Client", who],
+    ["IP", d.ip ?? "unknown"],
+    ["Country", d.country ?? "unknown"],
+    ["Browser", d.userAgent ?? "unknown"],
     ["Plan", d.plan],
     ["Models", d.engines.join(", ") || "none"],
     ["AI cost", `$${d.costUsd.toFixed(3)}`],
     ["Time", d.seconds !== null ? `${Math.round(d.seconds)} s` : "n/a"],
+    ["When (UTC)", d.at.toISOString().replace("T", " ").slice(0, 19)],
   ];
   const table = rows
     .map(([k, v]) => `<tr><td style="padding:4px 16px 4px 0;color:#5b6170">${escapeHtml(k)}</td><td style="padding:4px 0;color:#0b0d12">${escapeHtml(v)}</td></tr>`)
     .join("");
   return {
     to: d.to,
-    subject: `New analysis: ${d.domain} · ${outcome} (${d.plan}, ${who})`,
+    subject: `${d.reused ? "Report viewed" : "New analysis"}: ${d.domain} · ${outcome} (${d.plan}, ${who}, ${d.ip ?? "no IP"})`,
     html: layout(
-      `<h1 style="margin:0 0 16px;font-size:20px">New analysis: ${escapeHtml(d.domain)}</h1>
+      `<h1 style="margin:0 0 16px;font-size:20px">${d.reused ? "Report viewed" : "New analysis"}: ${escapeHtml(d.domain)}</h1>
 <table style="border-collapse:collapse;font-size:14px;line-height:1.5;margin:0 0 24px">${table}</table>
 ${button(d.reportUrl, "Open the report")}`,
       "You get this for every analysis a client runs (OWNER_NOTIFY_EMAIL).",

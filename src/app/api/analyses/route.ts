@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createAnalysis } from "@/lib/analyses";
+import { requestMeta } from "@/lib/owner-notify";
 import { currentUser } from "@/lib/auth/session";
 import { ANALYSIS_FAILED, publicMessage } from "@/lib/errors";
 import { burstLimited } from "@/lib/security/rate-limit";
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { id, reused } = await createAnalysis(parsed.data.url, ip, await currentUser());
+    const { id, reused } = await createAnalysis(parsed.data.url, requestMeta(req), await currentUser());
     return NextResponse.json({ id, reused }, { status: reused ? 200 : 201 });
   } catch (err) {
     const message = publicMessage(err, ANALYSIS_FAILED);

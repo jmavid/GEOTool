@@ -8,6 +8,7 @@ import type { BrandProfile } from "@/lib/pipeline/profile";
 import type { GeoScore } from "@/lib/pipeline/score";
 import type { Evidence } from "@/lib/pipeline/insights";
 import { runAnalysis } from "@/lib/pipeline/run";
+import { notifyOwner, type RequestMeta } from "@/lib/owner-notify";
 import { canonicalWebsiteUrl, validatePublicUrl } from "@/lib/security/url";
 import { unlimitedIp } from "@/lib/security/rate-limit";
 import { UserError } from "@/lib/errors";
@@ -33,7 +34,8 @@ export function hashIp(ip: string): string {
  * Anonymous visitors get the free check, limited per IP and by a global daily cap. Signed-in users run on their
  * plan: the site joins their dashboard (within the plan's website limit) and counts against its monthly analyses.
  */
-export async function createAnalysis(rawUrl: string, ip: string, user: User | null = null, projectId?: string): Promise<{ id: string; reused: boolean }> {
+export async function createAnalysis(rawUrl: string, meta: RequestMeta, user: User | null = null, projectId?: string): Promise<{ id: string; reused: boolean }> {
+  const ip = meta.ip;
   const url = validatePublicUrl(rawUrl);
   const canonical = canonicalWebsiteUrl(url);
   const db = getDb();
@@ -74,6 +76,7 @@ export async function createAnalysis(rawUrl: string, ip: string, user: User | nu
   // A smaller run (fewer questions than this plan asks) is not a substitute.
   if (recent && promptsFor(recent.plan) >= promptsFor(plan)) {
     if (project) await attachWebsite(project, website.id);
+    after(() => notifyOwner(recent.id, meta, { reused: true }));
     return { id: recent.id, reused: true };
   }
 
@@ -103,15 +106,15 @@ export async function createAnalysis(rawUrl: string, ip: string, user: User | nu
 
   const [created] = await db.insert(schema.analyses).values({ websiteId: website.id, ipHash, plan, userId: user?.id ?? null }).returning({ id: schema.analyses.id });
   if (project) await attachWebsite(project, website.id);
-  await enqueue(created.id);
+  await enqueue(created.id, meta);
   return { id: created.id, reused: false };
 }
 
 /** Production: Cloudflare Queue (no 30s waitUntil limit). `next dev`: run in-process after the response. */
-export async function enqueue(analysisId: string) {
+export async function enqueue(analysisId: string, meta?: RequestMeta) {
   const queue = process.env.NODE_ENV === "production" ? getCloudflareContext().env.ANALYSIS_QUEUE : undefined;
-  if (queue) await queue.send({ analysisId });
-  else after(() => runAnalysis(analysisId));
+  if (queue) await queue.send({ analysisId, meta });
+  else after(() => runAnalysis(analysisId, meta));
 }
 
 export type Report = NonNullable<Awaited<ReturnType<typeof getReport>>>;

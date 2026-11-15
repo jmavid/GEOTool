@@ -13,13 +13,13 @@ export default {
     return handler.fetch(request, env, ctx);
   },
 
-  /** @param {MessageBatch<{ analysisId: string }>} batch */
+  /** @param {MessageBatch<{ analysisId: string, meta?: { ip: string, country?: string, userAgent?: string } }>} batch */
   async queue(batch, env) {
     for (const msg of batch.messages) {
       const res = await env.WORKER_SELF_REFERENCE.fetch("https://internal/api/internal/run", {
         method: "POST",
         headers: { "content-type": "application/json", "x-internal-secret": env.INTERNAL_SECRET },
-        body: JSON.stringify({ analysisId: msg.body.analysisId }),
+        body: JSON.stringify({ analysisId: msg.body.analysisId, meta: msg.body.meta }),
       });
       if (!res.ok) console.error(`run ${msg.body.analysisId} -> HTTP ${res.status}`);
       msg.ack(); // never retry automatically: a retry would pay for the AI calls again
