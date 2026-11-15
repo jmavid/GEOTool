@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Check, ChevronDown, CircleAlert, Link as LinkIcon, RotateCcw, X } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, CircleAlert, Clock, Link as LinkIcon, RotateCcw, X } from "lucide-react";
 import type { Report } from "@/lib/analyses";
 import { UrlForm } from "@/components/url-form";
 import { TrackCta, type Viewer } from "@/components/track-cta";
 import { EmailReportForm } from "@/components/email-report-form";
+import { REPORT_REUSE_HOURS } from "@/lib/reuse";
 import { cn } from "@/lib/utils";
 
 type Result = NonNullable<Report["result"]>;
@@ -225,6 +226,7 @@ function Completed({ report, result, viewer }: { report: Report; result: Result;
             </p>
             <CopyLinkButton />
           </div>
+          <FreshnessNote createdAt={report.createdAt} />
 
           <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:gap-10">
             <ScoreRing score={result.geoScore} />
@@ -482,6 +484,23 @@ function Sentiment({ result, brand, providerNames }: { result: Result; brand: st
         </>
       )}
     </Card>
+  );
+}
+
+/** Reports are reused for 24h per site (REPORT_REUSE_HOURS), so say when a new analysis can run. */
+function FreshnessNote({ createdAt }: { createdAt: string | Date }) {
+  const ranAt = new Date(createdAt);
+  const nextAt = new Date(ranAt.getTime() + REPORT_REUSE_HOURS * 3_600_000);
+  const [now] = useState(() => Date.now()); // fixed per mount: rendered only in the browser, after the report loads
+  const fmt = (d: Date) => d.toLocaleString("en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return (
+    <p className="-mt-5 flex items-start gap-2 text-[13px] leading-normal text-muted-foreground">
+      <Clock className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+      <span>
+        Analyzed {fmt(ranAt)}. Each site is analyzed at most once every {REPORT_REUSE_HOURS} hours, so entering it again shows this report.{" "}
+        {nextAt.getTime() > now ? <>A new analysis can run from {fmt(nextAt)}.</> : <>You can run a new analysis now.</>}
+      </span>
+    </p>
   );
 }
 

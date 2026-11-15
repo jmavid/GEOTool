@@ -9,6 +9,7 @@ import type { Evidence } from "@/lib/pipeline/insights";
 import { runAnalysis } from "@/lib/pipeline/run";
 import { notifyOwner, type RequestMeta } from "@/lib/owner-notify";
 import { canonicalWebsiteUrl, validatePublicUrl } from "@/lib/security/url";
+import { REPORT_REUSE_HOURS } from "@/lib/reuse";
 import { hashIp, unlimitedIp } from "@/lib/security/rate-limit";
 import { UserError } from "@/lib/errors";
 import type { User } from "@/lib/auth/session";
@@ -16,12 +17,12 @@ import { planLimitError, promptsFor } from "@/lib/plans";
 import { analysesLast30Days, attachWebsite, defaultProjectId, ownedProject, trackedWebsiteIds } from "@/lib/projects";
 import { connectedExternalProviders, EXTERNAL_PROVIDERS, externalProvidersIncluded } from "@/providers";
 
-const DEDUPE_WINDOW_MS = 24 * 3_600_000;
+const DEDUPE_WINDOW_MS = REPORT_REUSE_HOURS * 3_600_000;
 const STALE_MS = 15 * 60_000;
 
 /**
  * Creates (or reuses) an analysis for a URL. Reuse within 24h is the main cost control:
- * the same site analyzed twice in a day costs nothing the second time.
+ * the same site analyzed twice in a day costs nothing the second time (except from UNLIMITED_IPS, which always rerun).
  *
  * Anonymous visitors get the free check, limited per IP and by a global daily cap. Signed-in users run on their
  * plan: the site joins their dashboard (within the plan's website limit) and counts against its monthly analyses.
@@ -65,8 +66,8 @@ export async function createAnalysis(rawUrl: string, meta: RequestMeta, user: Us
     ),
     orderBy: desc(schema.analyses.createdAt),
   });
-  // A smaller run (fewer questions than this plan asks) is not a substitute.
-  if (recent && promptsFor(recent.plan) >= promptsFor(plan)) {
+  // A smaller run (fewer questions than this plan asks) is not a substitute. The owner's own IPs always get a fresh run.
+  if (recent && promptsFor(recent.plan) >= promptsFor(plan) && !unlimitedIp(ip)) {
     if (project) await attachWebsite(project, website.id);
     after(() => notifyOwner(recent.id, meta, { reused: true }));
     return { id: recent.id, reused: true };
