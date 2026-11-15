@@ -50,6 +50,8 @@
     "OPENAI_VISIBILITY_MODEL": "openai/gpt-5-mini",
     "CLAUDE_MODEL": "anthropic/claude-haiku-5.5",
     "FREE_ANALYSES_PER_IP_PER_DAY": "3",
+    // IPs with no analysis limits (the owner's own): exact addresses or prefixes ending in "." or ":". Never in the repo.
+    "UNLIMITED_IPS": "",
     // Global cap on new analyses per 24h (Workers AI budget guard).
     "MAX_ANALYSES_PER_DAY": "100",
     // Public Turnstile site key. Turnstile switches on when this AND the TURNSTILE_SECRET_KEY secret are set.

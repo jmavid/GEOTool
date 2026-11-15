@@ -9,6 +9,7 @@ import type { GeoScore } from "@/lib/pipeline/score";
 import type { Evidence } from "@/lib/pipeline/insights";
 import { runAnalysis } from "@/lib/pipeline/run";
 import { canonicalWebsiteUrl, validatePublicUrl } from "@/lib/security/url";
+import { unlimitedIp } from "@/lib/security/rate-limit";
 import { UserError } from "@/lib/errors";
 import type { User } from "@/lib/auth/session";
 import { planLimitError, promptsFor } from "@/lib/plans";
@@ -77,7 +78,9 @@ export async function createAnalysis(rawUrl: string, ip: string, user: User | nu
   }
 
   const ipHash = hashIp(ip);
-  if (user) {
+  if (unlimitedIp(ip)) {
+    // The owner's own IP: no daily, global or monthly analysis limit (the website limit above still applies).
+  } else if (user) {
     const error = planLimitError(plan, { trackedSites: 0, alreadyTracked: true, analysesLast30Days: await analysesLast30Days(user.id) });
     if (error) throw new UserError(error);
   } else {
