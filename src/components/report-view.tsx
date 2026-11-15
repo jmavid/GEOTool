@@ -6,6 +6,7 @@ import { ArrowRight, Check, ChevronDown, CircleAlert, Link as LinkIcon, RotateCc
 import type { Report } from "@/lib/analyses";
 import { UrlForm } from "@/components/url-form";
 import { TrackCta, type Viewer } from "@/components/track-cta";
+import { EmailReportForm } from "@/components/email-report-form";
 import { cn } from "@/lib/utils";
 
 type Result = NonNullable<Report["result"]>;
@@ -97,6 +98,8 @@ function Running({ report }: { report: Report }) {
         Asking AI models about {report.profile?.brand ?? report.domain}…
       </h1>
       <p className="mt-2 text-muted-foreground">Usually 3–8 minutes. You can leave this page: the report link keeps working.</p>
+
+      <EmailReportForm analysisId={report.id} brand={report.profile?.brand ?? report.domain} />
 
       <section className="mt-8 rounded-2xl border bg-background p-5 sm:p-7">
         <div className="flex justify-between gap-4 text-sm">

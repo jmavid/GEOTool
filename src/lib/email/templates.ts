@@ -103,6 +103,8 @@ export interface OwnerAnalysisData {
   plan: string;
   /** The client's account email, or null for an anonymous free check. */
   account: string | null;
+  /** Emails left on the report page ("email me the report"). */
+  contacts?: string[];
   ip: string | null;
   country: string | null;
   userAgent: string | null;
@@ -127,6 +129,7 @@ export function ownerAnalysisEmail(d: OwnerAnalysisData): OutgoingEmail {
     ["Run", d.reused ? "Reused a recent report (no new AI calls)" : "New analysis"],
     ["Result", ownerResult(d)],
     ["Client", who],
+    ["Contact", d.contacts?.length ? d.contacts.join(", ") : "none left yet"],
     ["IP", d.ip ?? "unknown"],
     ["Country", d.country ?? "unknown"],
     ["Browser", d.userAgent ?? "unknown"],
@@ -147,6 +150,83 @@ export function ownerAnalysisEmail(d: OwnerAnalysisData): OutgoingEmail {
 <table style="border-collapse:collapse;font-size:14px;line-height:1.5;margin:0 0 24px">${table}</table>
 ${button(d.reportUrl, "Open the report")}`,
       "You get this for every analysis a client runs (OWNER_NOTIFY_EMAIL).",
+    ),
+    text: [...rows.map(([k, v]) => `${k}: ${v}`), `Report: ${d.reportUrl}`].join("\n"),
+  };
+}
+
+export interface ReportReadyData {
+  to: string;
+  domain: string;
+  brand: string;
+  /** null when the analysis failed. */
+  score: number | null;
+  mentioned: number;
+  responses: number;
+  topFix: string | null;
+  reportUrl: string;
+  /** Where to run a new check when the analysis failed. */
+  homeUrl: string;
+}
+
+/** To a visitor who asked on the report page to get the report by email. */
+export function reportReadyEmail(d: ReportReadyData): OutgoingEmail {
+  const brand = escapeHtml(d.brand);
+  if (d.score === null) {
+    return {
+      to: d.to,
+      subject: `We couldn't finish the AI visibility report for ${d.domain}`,
+      html: layout(
+        `<h1 style="margin:0 0 12px;font-size:22px;line-height:1.25">We couldn't finish your report</h1>
+<p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#4a5060">Something stopped the analysis of ${escapeHtml(d.domain)}. Running it again usually works.</p>
+${button(d.homeUrl, "Try again")}`,
+        "You asked for this report on GEO Garner. We only email you about it.",
+      ),
+      text: `We couldn't finish the AI visibility report for ${d.domain}. Running it again usually works: ${d.homeUrl}`,
+    };
+  }
+  return {
+    to: d.to,
+    subject: `${d.brand}: GEO Score ${d.score}/100 — your AI visibility report is ready`,
+    html: layout(
+      `<p style="margin:0;font-size:13px;color:#5b6170">${escapeHtml(d.domain)} · AI visibility report</p>
+<p style="margin:8px 0 20px;font-size:48px;font-weight:700;letter-spacing:-1px;line-height:1">${d.score}<span style="font-size:16px;font-weight:400;color:#5b6170"> / 100</span></p>
+<p style="margin:0 0 20px;font-size:15px;line-height:1.55;color:#4a5060">AI models mentioned ${brand} in <strong style="color:#0b0d12">${d.mentioned} of ${d.responses}</strong> answers to your buyers' questions. The report shows who they recommend instead and what to fix first.</p>
+${d.topFix ? `<p style="margin:0 0 24px;padding:14px;border-radius:10px;background:#f6f7f9;font-size:14px;line-height:1.5"><strong>Fix #1:</strong> ${escapeHtml(d.topFix)}</p>` : ""}
+${button(d.reportUrl, "See the full report and action plan")}`,
+      "You asked for this report on GEO Garner. Reply to this email if you have questions about it.",
+    ),
+    text: [
+      `${d.domain}: GEO Score ${d.score}/100`,
+      `AI models mentioned ${d.brand} in ${d.mentioned} of ${d.responses} answers.`,
+      d.topFix ? `Fix #1: ${d.topFix}` : "",
+      `Full report and action plan: ${d.reportUrl}`,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  };
+}
+
+/** To the site owner: a visitor left their email on a report. */
+export function ownerLeadEmail(d: { to: string; email: string; domain: string; marketing: boolean; reportUrl: string; ip: string | null; country: string | null }): OutgoingEmail {
+  const rows: [string, string][] = [
+    ["Email", d.email],
+    ["Website checked", d.domain],
+    ["Product news", d.marketing ? "Yes, opted in" : "No (report only)"],
+    ["IP", d.ip ?? "unknown"],
+    ["Country", d.country ?? "unknown"],
+  ];
+  const table = rows
+    .map(([k, v]) => `<tr><td style="padding:4px 16px 4px 0;color:#5b6170">${escapeHtml(k)}</td><td style="padding:4px 0;color:#0b0d12">${escapeHtml(v)}</td></tr>`)
+    .join("");
+  return {
+    to: d.to,
+    subject: `New contact: ${d.email} (${d.domain})`,
+    html: layout(
+      `<h1 style="margin:0 0 16px;font-size:20px">New contact: ${escapeHtml(d.email)}</h1>
+<table style="border-collapse:collapse;font-size:14px;line-height:1.5;margin:0 0 24px">${table}</table>
+${button(d.reportUrl, "Open their report")}`,
+      "A visitor asked to get their report by email (OWNER_NOTIFY_EMAIL).",
     ),
     text: [...rows.map(([k, v]) => `${k}: ${v}`), `Report: ${d.reportUrl}`].join("\n"),
   };

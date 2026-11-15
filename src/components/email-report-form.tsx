@@ -1,0 +1,112 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { ArrowRight, Check, Mail } from "lucide-react";
+
+const storageKey = (id: string) => `geo-lead:${id}`;
+
+/** "Email me the report" while the analysis runs: the visitor can leave and still get the result. */
+export function EmailReportForm({ analysisId, brand }: { analysisId: string; brand: string }) {
+  const [email, setEmail] = useState("");
+  const [marketing, setMarketing] = useState(false);
+  // Only rendered after the report loads in the browser, so reading storage here never mismatches the server HTML.
+  const [sentTo, setSentTo] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(storageKey(analysisId));
+    } catch {
+      return null; // Storage blocked: the form simply shows again.
+    }
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ analysisId, email, marketing }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "We couldn't save your email. Try again.");
+      const saved = email.trim();
+      setSentTo(saved);
+      try {
+        localStorage.setItem(storageKey(analysisId), saved);
+      } catch {}
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "We couldn't save your email. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (sentTo) {
+    return (
+      <section className="mt-6 flex items-start gap-3 rounded-2xl border border-brand/20 bg-brand-soft p-5 sm:px-7" aria-live="polite">
+        <span className="mt-0.5 inline-flex size-[22px] shrink-0 items-center justify-center rounded-full bg-blue-50">
+          <Check className="size-3.5 text-blue-700" strokeWidth={3} aria-hidden />
+        </span>
+        <p className="text-[15px] leading-normal">
+          Done. We&apos;ll email the report for {brand} to <strong className="break-all">{sentTo}</strong> as soon as it&apos;s ready. You can close this page.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="mt-6 rounded-2xl border border-brand/20 bg-brand-soft p-5 sm:p-7">
+      <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+        <Mail className="size-5 text-brand" aria-hidden /> Don&apos;t wait here: get the report by email
+      </h2>
+      <p className="mt-1 text-sm leading-normal text-muted-foreground">
+        Your GEO Score, who AI recommends instead of {brand}, and the fix that matters most, in your inbox when it&apos;s ready.
+      </p>
+      <form onSubmit={submit} className="mt-4">
+        <div className="flex flex-col gap-2.5 sm:flex-row">
+          <label htmlFor="lead-email" className="sr-only">
+            Your email
+          </label>
+          <input
+            id="lead-email"
+            type="email"
+            required
+            autoComplete="email"
+            inputMode="email"
+            placeholder="you@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="h-11 w-full min-w-0 shrink-0 rounded-xl border sm:w-auto sm:flex-1 bg-background px-3.5 text-[15px] outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          />
+          <button
+            type="submit"
+            disabled={busy}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand px-5 font-semibold text-brand-foreground hover:bg-brand/90 disabled:opacity-60"
+          >
+            {busy ? "Saving…" : "Email me the report"} {!busy && <ArrowRight className="size-4" aria-hidden />}
+          </button>
+        </div>
+        <label className="mt-3 flex items-start gap-2.5 text-sm text-muted-foreground">
+          <input type="checkbox" checked={marketing} onChange={(e) => setMarketing(e.target.checked)} className="mt-0.5 size-4 accent-[var(--color-brand)]" />
+          <span>Also send me occasional tips to get recommended by AI assistants (optional, unsubscribe anytime).</span>
+        </label>
+        {error && (
+          <p role="alert" className="mt-3 text-sm font-medium text-orange-700">
+            {error}
+          </p>
+        )}
+        <p className="mt-3 text-xs text-muted-foreground">
+          We use your email to send this report{marketing ? " and the tips you asked for" : ""}. See our{" "}
+          <Link href="/privacy" className="underline underline-offset-2">
+            privacy policy
+          </Link>
+          .
+        </p>
+      </form>
+    </section>
+  );
+}

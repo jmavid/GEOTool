@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { sendOwnerEmail } from "@/lib/email/owner-send";
 import { ownerAnalysisEmail } from "@/lib/email/templates";
+import { leadEmailsFor } from "@/lib/leads";
 import { appUrl } from "@/lib/tracking";
 
 /** Who asked for an analysis. Only travels with the queue message to the owner's email; never stored. */
@@ -49,6 +50,7 @@ export async function notifyOwner(analysisId: string, meta?: RequestMeta, opts: 
         error: analysis.error,
         plan: analysis.plan,
         account: user?.email ?? null,
+        contacts: await leadEmailsFor(analysis.id),
         ip: meta?.ip ?? null,
         country: meta?.country ?? null,
         userAgent: meta?.userAgent ?? null,

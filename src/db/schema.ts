@@ -250,3 +250,25 @@ export const subscriptions = sqliteTable(
   },
   (t) => [uniqueIndex("subscriptions_email_website_idx").on(t.email, t.websiteId), uniqueIndex("subscriptions_token_idx").on(t.token)],
 );
+
+/**
+ * Contacts left on the report page ("email me the report"). The report email is something they asked for; product
+ * news only goes to rows with marketingConsent. Kept until they ask to be removed.
+ */
+export const leads = sqliteTable(
+  "leads",
+  {
+    id: id(),
+    email: text("email").notNull(),
+    analysisId: text("analysis_id").references(() => analyses.id, { onDelete: "set null" }),
+    websiteId: text("website_id")
+      .notNull()
+      .references(() => websites.id, { onDelete: "cascade" }),
+    marketingConsent: integer("marketing_consent", { mode: "boolean" }).notNull().default(false),
+    ipHash: text("ip_hash"),
+    /** When the "your report is ready" email went out; null until it is sent. */
+    reportSentAt: integer("report_sent_at", { mode: "timestamp_ms" }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("leads_email_analysis_idx").on(t.email, t.analysisId), index("leads_analysis_idx").on(t.analysisId), index("leads_ip_idx").on(t.ipHash)],
+);

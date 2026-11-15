@@ -1,3 +1,13 @@
+import { createHash } from "node:crypto";
+
+/** Salted one-way hash: IPs are never stored in the clear. */
+export function hashIp(ip: string): string {
+  return createHash("sha256")
+    .update(`${process.env.IP_HASH_SALT ?? "geotool"}:${ip}`)
+    .digest("hex")
+    .slice(0, 32);
+}
+
 // Per-isolate burst limiter for the create endpoint. The durable daily limit lives in D1 (see createAnalysis).
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 5;

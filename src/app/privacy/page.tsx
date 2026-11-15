@@ -26,6 +26,10 @@ export default function PrivacyPage() {
           billing.
         </li>
         <li>
+          <strong>Your email address</strong>, if you ask us to email you a report: to send that report and, only if you tick the box, occasional
+          tips about AI visibility. We also see the website you checked.
+        </li>
+        <li>
           <strong>Billing details</strong> are handled by Stripe. We only keep your Stripe customer id and subscription status; we never see your
           card.
         </li>
@@ -33,7 +37,8 @@ export default function PrivacyPage() {
 
       <h2>Legal basis</h2>
       <p>
-        Performing our contract with you (account, weekly emails, billing), our legitimate interest in preventing abuse (hashed IPs, bot checks),
+        Performing our contract with you (account, weekly emails, billing, the report you asked us to email), your consent (tips, which you can
+        withdraw anytime), our legitimate interest in preventing abuse (hashed IPs, bot checks),
         and legal obligations (invoices).
       </p>
 
@@ -49,7 +54,7 @@ export default function PrivacyPage() {
 
       <h2>How long we keep it</h2>
       <p>
-        Account data: until you delete your account. Sign-in links: 24 hours. Sessions: 30 days. Invoices: as long as tax law requires (kept by
+        Account data: until you delete your account. Emails left for a report: until you ask us to remove them. Sign-in links: 24 hours. Sessions: 30 days. Invoices: as long as tax law requires (kept by
         Stripe).
       </p>
 

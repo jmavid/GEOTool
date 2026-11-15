@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { after } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { and, asc, count, desc, eq, gte, inArray, isNull } from "drizzle-orm";
@@ -10,7 +9,7 @@ import type { Evidence } from "@/lib/pipeline/insights";
 import { runAnalysis } from "@/lib/pipeline/run";
 import { notifyOwner, type RequestMeta } from "@/lib/owner-notify";
 import { canonicalWebsiteUrl, validatePublicUrl } from "@/lib/security/url";
-import { unlimitedIp } from "@/lib/security/rate-limit";
+import { hashIp, unlimitedIp } from "@/lib/security/rate-limit";
 import { UserError } from "@/lib/errors";
 import type { User } from "@/lib/auth/session";
 import { planLimitError, promptsFor } from "@/lib/plans";
@@ -19,13 +18,6 @@ import { connectedExternalProviders, EXTERNAL_PROVIDERS, externalProvidersInclud
 
 const DEDUPE_WINDOW_MS = 24 * 3_600_000;
 const STALE_MS = 15 * 60_000;
-
-export function hashIp(ip: string): string {
-  return createHash("sha256")
-    .update(`${process.env.IP_HASH_SALT ?? "geotool"}:${ip}`)
-    .digest("hex")
-    .slice(0, 32);
-}
 
 /**
  * Creates (or reuses) an analysis for a URL. Reuse within 24h is the main cost control:

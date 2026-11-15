@@ -5,6 +5,7 @@ import { cached, cacheKey } from "@/lib/ai/cache";
 import { CostTracker } from "@/lib/ai/cost";
 import { ANALYSIS_FAILED, publicMessage, UserError } from "@/lib/errors";
 import { promptsFor } from "@/lib/plans";
+import { notifyLeads } from "@/lib/leads";
 import { notifyOwner, type RequestMeta } from "@/lib/owner-notify";
 import { notifySubscribers } from "@/lib/tracking";
 import { activeProviders, EXTERNAL_PROVIDERS, externalPromptLimit } from "@/providers";
@@ -188,10 +189,12 @@ export async function runAnalysis(analysisId: string, meta?: RequestMeta): Promi
     console.error(`[analysis ${analysisId}] failed:`, err);
     await update({ status: "FAILED", error: publicMessage(err, ANALYSIS_FAILED), ...costFields() }).catch(() => {});
     await notifyOwner(analysisId, meta);
+    await notifyLeads(analysisId);
     return;
   }
 
   await notifyOwner(analysisId, meta);
+  await notifyLeads(analysisId);
 
   // Outside the try: a mail failure must never mark a finished analysis as FAILED.
   if (analysis.trigger === "SCHEDULED") {

@@ -3,7 +3,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { and, count, eq, gt, gte, isNull, lt } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { hashIp } from "@/lib/analyses";
+import { hashIp } from "@/lib/security/rate-limit";
 import { emailConfigured, sendEmail } from "@/lib/email/send";
 import { loginEmail } from "@/lib/email/templates";
 import { appUrl } from "@/lib/tracking";
@@ -125,6 +125,7 @@ export function sameOrigin(req: Request): boolean {
 export async function deleteAccount(user: User): Promise<void> {
   const db = getDb();
   await db.delete(schema.subscriptions).where(eq(schema.subscriptions.email, user.email));
+  await db.delete(schema.leads).where(eq(schema.leads.email, user.email));
   await db.delete(schema.loginTokens).where(eq(schema.loginTokens.email, user.email));
   await db.delete(schema.users).where(eq(schema.users.id, user.id));
   (await cookies()).delete(SESSION_COOKIE);
