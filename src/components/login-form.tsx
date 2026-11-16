@@ -47,9 +47,9 @@ export function LoginForm({ turnstileSiteKey = null, plan = null }: { turnstileS
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-3">
-      <label htmlFor={inputId} className="text-[13px] font-medium">
-        Email
+    <form onSubmit={submit} className="flex flex-col">
+      <label htmlFor={inputId} className="text-sm font-semibold">
+        Work email
       </label>
       <Input
         id={inputId}
@@ -59,26 +59,32 @@ export function LoginForm({ turnstileSiteKey = null, plan = null }: { turnstileS
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         aria-invalid={error ? true : undefined}
-        className="h-12 text-base"
+        className="mt-2 h-11 rounded-md text-base"
         required
       />
-      <Button type="submit" disabled={state === "sending"} className="h-12 rounded-xl bg-brand text-base font-semibold text-brand-foreground hover:bg-brand/90">
+      <label className="mt-5 flex items-start gap-2.5 text-sm text-muted-foreground">
+        <input type="checkbox" required className="mt-0.5 size-4 shrink-0 accent-[var(--color-brand)]" />
+        <span>
+          I accept the{" "}
+          <a href="/terms" className="text-foreground underline underline-offset-2">
+            Terms
+          </a>{" "}
+          &amp;{" "}
+          <a href="/privacy" className="text-foreground underline underline-offset-2">
+            Privacy notice
+          </a>
+        </span>
+      </label>
+      {turnstileSiteKey && (
+        <div className="mt-4">
+          <Turnstile siteKey={turnstileSiteKey} onToken={setToken} resetSignal={resetSignal} />
+        </div>
+      )}
+      <Button type="submit" disabled={state === "sending"} className="mt-7 h-11 w-full rounded-md bg-brand text-[15px] font-semibold text-brand-foreground hover:bg-brand/90">
         {state === "sending" ? "Sending…" : "Email me a sign-in link"}
       </Button>
-      <p className="text-xs text-muted-foreground">
-        By continuing you accept the{" "}
-        <a href="/terms" className="underline underline-offset-2">
-          Terms
-        </a>{" "}
-        and{" "}
-        <a href="/privacy" className="underline underline-offset-2">
-          Privacy notice
-        </a>
-        .
-      </p>
-      {turnstileSiteKey && <Turnstile siteKey={turnstileSiteKey} onToken={setToken} resetSignal={resetSignal} />}
       {error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="mt-3 text-sm text-destructive">
           {error}
         </p>
       )}
