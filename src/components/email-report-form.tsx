@@ -77,7 +77,7 @@ export function EmailReportForm({ analysisId, brand, variant, onDone }: { analys
       </h2>
       <p className="mt-1 text-sm leading-normal text-muted-foreground">
         {locked
-          ? `Your GEO Score, who AI recommends instead of ${brand}, and your action plan. We'll also email you a copy.`
+          ? `Who AI recommends instead of ${brand}, the results model by model, and your action plan. We'll also email you a copy.`
           : `You'll need your email to open the results. Leave it now and we'll also send the report when it's ready, so you don't have to wait here.`}
       </p>
       <form onSubmit={submit} className="mt-4">

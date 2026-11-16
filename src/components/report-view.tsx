@@ -8,11 +8,12 @@ import { UrlForm } from "@/components/url-form";
 import { TrackCta, type Viewer } from "@/components/track-cta";
 import { EmailReportForm } from "@/components/email-report-form";
 import { REPORT_REUSE_HOURS } from "@/lib/reuse";
+import type { ReportTeaser } from "@/lib/teaser";
 import { cn } from "@/lib/utils";
 
 type Result = NonNullable<Report["result"]>;
 /** The API hides a finished report's results until the visitor gives an email (see api/analyses/[id]). */
-type ApiReport = Report & { locked?: boolean };
+type ApiReport = Report & { locked?: boolean; teaser?: ReportTeaser };
 
 /** Pipeline stages with the progress value each one starts at (see lib/pipeline/run.ts). */
 const STEPS: [string, number][] = [
@@ -169,16 +170,35 @@ function Running({ report }: { report: Report }) {
   );
 }
 
-function Locked({ report, onUnlocked }: { report: Report; onUnlocked: () => void }) {
+function Locked({ report, onUnlocked }: { report: ApiReport; onUnlocked: () => void }) {
   const brand = report.profile?.brand ?? report.domain;
+  const t = report.teaser;
   return (
     <Shell>
       <p className="font-mono text-xs text-muted-foreground">{report.domain}</p>
       <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Your AI visibility report for {brand} is ready</h1>
-      <p className="mt-2 text-muted-foreground">We asked AI models the questions your buyers ask. Enter your email to open the results.</p>
+      {t ? (
+        <section className="mt-6 flex flex-col items-start gap-6 rounded-2xl border bg-background p-5 sm:flex-row sm:items-center sm:gap-8 sm:p-7">
+          <ScoreRing score={t.geoScore} />
+          <div className="flex flex-col gap-2.5">
+            <span className={cn("self-start rounded-md px-2.5 py-1 text-[13px] font-semibold", scoreTone(t.geoScore).chip)}>{scoreTone(t.geoScore).label}</span>
+            <p className="text-balance text-xl font-semibold leading-snug tracking-tight">{teaserHook(brand, t)}</p>
+            <p className="text-sm text-muted-foreground">Who they recommend instead, model by model, and your action plan are in the full report.</p>
+          </div>
+        </section>
+      ) : (
+        <p className="mt-2 text-muted-foreground">We asked AI models the questions your buyers ask. Enter your email to open the results.</p>
+      )}
       <EmailReportForm analysisId={report.id} brand={brand} variant="locked" onDone={onUnlocked} />
     </Shell>
   );
+}
+
+/** The one line a locked report gives away: how often AI names the brand and how many rivals it names more. */
+function teaserHook(brand: string, t: ReportTeaser): string {
+  const named = `AI assistants named ${brand} in ${t.mentioned} of ${t.responses} answers`;
+  if (t.aheadCount === 0) return t.mentioned ? `${named}, more often than any competitor.` : `${named}.`;
+  return `${named}. ${t.aheadCount} competitor${t.aheadCount === 1 ? " was" : "s were"} named more often.`;
 }
 
 function ScoreRing({ score }: { score: number }) {
