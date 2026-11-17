@@ -5,7 +5,8 @@ import { and, count, eq, gt, gte, isNull, lt } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { hashIp } from "@/lib/security/rate-limit";
 import { emailConfigured, sendEmail } from "@/lib/email/send";
-import { loginEmail } from "@/lib/email/templates";
+import { resetEmail, verifyEmail } from "@/lib/email/templates";
+import { hashPassword, passwordProblem, verifyPassword } from "@/lib/auth/password";
 import { appUrl } from "@/lib/tracking";
 import { UserError } from "@/lib/errors";
 
@@ -22,10 +23,14 @@ const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 const newToken = () => randomBytes(32).toString("base64url");
 export const isTokenShape = (t: string) => /^[A-Za-z0-9_-]{43}$/.test(t);
 
-/** Emails a single-use sign-in link. Says nothing about whether the address has an account. `plan`: resume checkout after. */
-export async function requestLoginLink(rawEmail: string, ip: string, plan: string | null = null): Promise<void> {
-  if (!emailConfigured()) throw new UserError("Sign-in isn't open yet. Please check back soon.");
-  const email = rawEmail.trim().toLowerCase();
+type TokenPurpose = "login" | "verify" | "reset";
+
+/**
+ * Stores a single-use link token (only its SHA-256) and returns the raw token for the email. Rate-limited per address
+ * and per IP, so the forms can't be used to flood someone's inbox.
+ */
+async function issueToken(email: string, ip: string, purpose: TokenPurpose, passwordHash: string | null = null): Promise<string> {
+  if (!emailConfigured()) throw new UserError("Accounts aren't open yet. Please check back soon.");
   const db = getDb();
   const ipHash = hashIp(ip);
   const hourAgo = new Date(Date.now() - 3_600_000);
@@ -34,39 +39,105 @@ export async function requestLoginLink(rawEmail: string, ip: string, plan: strin
     db.select({ n: count() }).from(schema.loginTokens).where(and(eq(schema.loginTokens.ipHash, ipHash), gte(schema.loginTokens.createdAt, hourAgo))),
   ]);
   if (byEmail.n >= LINKS_PER_EMAIL_PER_HOUR || byIp.n >= LINKS_PER_IP_PER_HOUR) {
-    throw new UserError("Too many sign-in emails. Use the last link we sent, or try again in an hour.");
+    throw new UserError("Too many emails sent. Use the last link we sent, or try again in an hour.");
   }
-
   const token = newToken();
-  await db.insert(schema.loginTokens).values({ id: sha256(token), email, ipHash, expiresAt: new Date(Date.now() + LINK_MINUTES * 60_000) });
-  const sent = await sendEmail(loginEmail({ to: email, loginUrl: `${appUrl()}/auth/verify/${token}${plan ? `?plan=${plan}` : ""}`, minutes: LINK_MINUTES }));
-  if (!sent) throw new UserError("We couldn't send the email. Please try again later.");
+  await db.insert(schema.loginTokens).values({ id: sha256(token), email, ipHash, purpose, passwordHash, expiresAt: new Date(Date.now() + LINK_MINUTES * 60_000) });
+  return token;
 }
 
-/** Spends a sign-in token and returns the (possibly new) user, or null when the link is unknown, used or expired. */
-export async function consumeLoginToken(token: string): Promise<User | null> {
+async function send(email: Parameters<typeof sendEmail>[0]): Promise<void> {
+  if (!(await sendEmail(email))) throw new UserError("We couldn't send the email. Please try again later.");
+}
+
+const normalize = (raw: string) => raw.trim().toLowerCase();
+const withPlan = (url: string, plan: string | null) => (plan ? `${url}?plan=${plan}` : url);
+
+/**
+ * Sign-up: emails a confirmation link. The account and its password are only created when that link is used, so nobody
+ * can claim someone else's address. If the address already has an account, it gets a "set a new password" link instead,
+ * and the response is the same either way (the form doesn't reveal who has an account).
+ */
+export async function signUp(rawEmail: string, password: string, ip: string, plan: string | null = null): Promise<void> {
+  const problem = passwordProblem(password);
+  if (problem) throw new UserError(problem);
+  const email = normalize(rawEmail);
+  const existing = await getDb().query.users.findFirst({ columns: { id: true }, where: eq(schema.users.email, email) });
+  if (existing) {
+    const token = await issueToken(email, ip, "reset");
+    await send(resetEmail({ to: email, url: `${appUrl()}/reset/${token}`, minutes: LINK_MINUTES, signupAttempt: true }));
+    return;
+  }
+  const token = await issueToken(email, ip, "verify", await hashPassword(password));
+  await send(verifyEmail({ to: email, url: withPlan(`${appUrl()}/auth/verify/${token}`, plan), minutes: LINK_MINUTES }));
+}
+
+// Compared against when the address has no password, so a wrong email takes as long as a wrong password.
+const DUMMY_HASH = "pbkdf2$100000$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
+/** The account for this email and password, or null. Accounts made with email links have no password until reset. */
+export async function signIn(rawEmail: string, password: string): Promise<User | null> {
+  const user = await getDb().query.users.findFirst({ where: eq(schema.users.email, normalize(rawEmail)) });
+  const ok = await verifyPassword(password, user?.passwordHash ?? DUMMY_HASH);
+  return ok && user?.passwordHash ? user : null;
+}
+
+/** Emails a "set a new password" link if the address has an account; silent otherwise (same response either way). */
+export async function requestPasswordReset(rawEmail: string, ip: string): Promise<void> {
+  const email = normalize(rawEmail);
+  const user = await getDb().query.users.findFirst({ columns: { id: true }, where: eq(schema.users.email, email) });
+  if (!user) return;
+  const token = await issueToken(email, ip, "reset");
+  await send(resetEmail({ to: email, url: `${appUrl()}/reset/${token}`, minutes: LINK_MINUTES }));
+}
+
+/** Spends a link token of one of these purposes; returns its row, or null when unknown, used, expired or another kind. */
+async function spendToken(token: string, purposes: TokenPurpose[]) {
   if (!isTokenShape(token)) return null;
-  const db = getDb();
   const now = new Date();
   // The conditional UPDATE is the single-use guarantee: two clicks can't both get a row back.
-  const [row] = await db
+  const [row] = await getDb()
     .update(schema.loginTokens)
     .set({ usedAt: now })
     .where(and(eq(schema.loginTokens.id, sha256(token)), isNull(schema.loginTokens.usedAt), gt(schema.loginTokens.expiresAt, now)))
-    .returning({ email: schema.loginTokens.email });
-  if (!row) return null;
-  await db.insert(schema.users).values({ email: row.email }).onConflictDoNothing();
-  return (await db.query.users.findFirst({ where: eq(schema.users.email, row.email) })) ?? null;
+    .returning({ email: schema.loginTokens.email, purpose: schema.loginTokens.purpose, passwordHash: schema.loginTokens.passwordHash });
+  return row && purposes.includes(row.purpose) ? row : null;
 }
 
-/** Whether the link still works, without spending it (the verify page only spends it on the button press). */
-export async function loginTokenUsable(token: string): Promise<boolean> {
-  if (!isTokenShape(token)) return false;
+/** Creates the account if needed, marks the email proven and, when given, sets the password. */
+async function provenAccount(email: string, passwordHash: string | null): Promise<User | null> {
+  const db = getDb();
+  const now = new Date();
+  await db.insert(schema.users).values({ email, passwordHash, emailVerifiedAt: now }).onConflictDoNothing();
+  await db
+    .update(schema.users)
+    .set(passwordHash ? { passwordHash, emailVerifiedAt: now } : { emailVerifiedAt: now })
+    .where(eq(schema.users.email, email));
+  return (await db.query.users.findFirst({ where: eq(schema.users.email, email) })) ?? null;
+}
+
+/** Spends a sign-up confirmation link (or an older emailed sign-in link) and returns the (possibly new) user, or null when it doesn't work. */
+export async function consumeLoginToken(token: string): Promise<User | null> {
+  const row = await spendToken(token, ["login", "verify"]);
+  return row ? provenAccount(row.email, row.passwordHash) : null;
+}
+
+/** Spends a password-reset link and sets the new password. Null when the link doesn't work. */
+export async function resetPassword(token: string, password: string): Promise<User | null> {
+  const problem = passwordProblem(password);
+  if (problem) throw new UserError(problem);
+  const row = await spendToken(token, ["reset"]);
+  return row ? provenAccount(row.email, await hashPassword(password)) : null;
+}
+
+/** The link's purpose while it still works (without spending it: pages only spend it on a button press), else null. */
+export async function usableTokenPurpose(token: string): Promise<TokenPurpose | null> {
+  if (!isTokenShape(token)) return null;
   const row = await getDb().query.loginTokens.findFirst({
-    columns: { id: true },
+    columns: { purpose: true },
     where: and(eq(schema.loginTokens.id, sha256(token)), isNull(schema.loginTokens.usedAt), gt(schema.loginTokens.expiresAt, new Date())),
   });
-  return !!row;
+  return row?.purpose ?? null;
 }
 
 export async function startSession(userId: string): Promise<void> {

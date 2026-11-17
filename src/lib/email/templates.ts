@@ -75,17 +75,36 @@ ${button(d.reportUrl, "See the full report")}`,
   };
 }
 
-export function loginEmail(p: { to: string; loginUrl: string; minutes: number }): OutgoingEmail {
+/** Confirms a new account's address; the account (and its password) only exists once this link is used. */
+export function verifyEmail(p: { to: string; url: string; minutes: number }): OutgoingEmail {
   return {
     to: p.to,
-    subject: "Your GEO Garner sign-in link",
+    subject: "Confirm your email for GEO Garner",
     html: layout(
-      `<h1 style="margin:0 0 12px;font-size:22px;line-height:1.25">Sign in to GEO Garner</h1>
-<p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#4a5060">Click the button to sign in. The link works once and expires in ${p.minutes} minutes.</p>
-${button(p.loginUrl, "Sign in")}`,
-      "If you didn't ask to sign in, ignore this email: nobody can get in without this link.",
+      `<h1 style="margin:0 0 12px;font-size:22px;line-height:1.25">Confirm your email</h1>
+<p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#4a5060">Click the button to confirm this address and finish creating your GEO Garner account. The link works once and expires in ${p.minutes} minutes.</p>
+${button(p.url, "Confirm my email")}`,
+      "If you didn't sign up for GEO Garner, ignore this email: no account is created without this link.",
     ),
-    text: `Sign in to GEO Garner (the link works once and expires in ${p.minutes} minutes):\n${p.loginUrl}\n\nIf you didn't ask to sign in, ignore this email.`,
+    text: `Confirm your email and finish creating your GEO Garner account (the link works once and expires in ${p.minutes} minutes):\n${p.url}\n\nIf you didn't sign up, ignore this email.`,
+  };
+}
+
+/** Password recovery. Also sent when someone tries to sign up with an address that already has an account. */
+export function resetEmail(p: { to: string; url: string; minutes: number; signupAttempt?: boolean }): OutgoingEmail {
+  const intro = p.signupAttempt
+    ? "Someone (probably you) tried to create a GEO Garner account with this email, but you already have one. Sign in with your password, or set a new one here."
+    : "Click the button to choose a new password for your GEO Garner account.";
+  return {
+    to: p.to,
+    subject: p.signupAttempt ? "You already have a GEO Garner account" : "Reset your GEO Garner password",
+    html: layout(
+      `<h1 style="margin:0 0 12px;font-size:22px;line-height:1.25">${p.signupAttempt ? "You already have an account" : "Reset your password"}</h1>
+<p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#4a5060">${intro} The link works once and expires in ${p.minutes} minutes.</p>
+${button(p.url, "Set a new password")}`,
+      "If you didn't ask for this, ignore this email: your password stays the same.",
+    ),
+    text: `${intro}\n${p.url}\n\nThe link works once and expires in ${p.minutes} minutes. If you didn't ask for this, ignore this email.`,
   };
 }
 

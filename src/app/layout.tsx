@@ -54,7 +54,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
                 </>
               ) : (
                 <>
-                  <Link href="/login" className="text-muted-foreground hover:text-foreground">Sign in</Link>
+                  <Link href="/signup" className="text-muted-foreground hover:text-foreground">Sign up</Link>
                   <Link href="/#check" className="inline-flex h-10 items-center rounded-lg bg-foreground px-4 font-medium text-background hover:bg-foreground/85">
                     Check my site
                   </Link>

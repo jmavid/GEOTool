@@ -9,7 +9,7 @@ export async function POST(req: Request) {
   const plan = paidPlan((await req.formData().catch(() => null))?.get("plan"));
   if (!plan) return NextResponse.redirect(new URL("/pricing", req.url), 303);
   const user = await currentUser();
-  if (!user) return NextResponse.redirect(new URL(`/login?plan=${plan}`, req.url), 303);
+  if (!user) return NextResponse.redirect(new URL(`/signup?plan=${plan}`, req.url), 303);
   try {
     return NextResponse.redirect(await checkoutUrl(user, plan), 303);
   } catch (err) {

@@ -31,6 +31,10 @@ export const users = sqliteTable("users", {
   currentPeriodEnd: integer("current_period_end", { mode: "timestamp_ms" }),
   /** Agency plan: name printed on client reports. */
   agencyName: text("agency_name"),
+  /** PBKDF2 hash (lib/auth/password.ts). Null for accounts made with email links before passwords existed. */
+  passwordHash: text("password_hash"),
+  /** When the address was proven by clicking one of our email links. */
+  emailVerifiedAt: integer("email_verified_at", { mode: "timestamp_ms" }),
   createdAt: createdAt(),
 });
 
@@ -55,6 +59,10 @@ export const loginTokens = sqliteTable(
     id: text("id").primaryKey(),
     email: text("email").notNull(),
     ipHash: text("ip_hash"),
+    /** login: magic link; verify: confirms a sign-up; reset: sets a new password. */
+    purpose: text("purpose", { enum: ["login", "verify", "reset"] }).notNull().default("login"),
+    /** Sign-up only: the chosen password's hash, applied to the account when the email is confirmed (never before). */
+    passwordHash: text("password_hash"),
     expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
     usedAt: integer("used_at", { mode: "timestamp_ms" }),
     createdAt: createdAt(),
