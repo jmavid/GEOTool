@@ -59,12 +59,17 @@ export async function saveLead(input: { analysisId: string; email: string; marke
   }
 
   const done = analysis.status === "COMPLETED" || analysis.status === "FAILED";
+  // Asking again resends the link (the report only opens from it), e.g. when the first email went to spam.
+  if (done && existing?.reportSentAt) await db.update(schema.leads).set({ reportSentAt: null }).where(eq(schema.leads.id, existing.id));
   if (done) await notifyLeads(analysis.id);
   return { ready: done, token };
 }
 
-/** Cookie that remembers a visitor already gave their email, so their reports open without asking again. */
-export const LEAD_COOKIE = "gg_contact";
+/**
+ * Cookie set by the emailed report link (a verified address), so that contact's later reports open without asking
+ * again. Renamed from "gg_contact", which the form used to set before the address was verified.
+ */
+export const LEAD_COOKIE = "gg_contact_v";
 export const LEAD_COOKIE_MAX_AGE = 365 * 24 * 3600;
 const TOKEN_RE = /^[0-9a-f-]{32,36}$/;
 

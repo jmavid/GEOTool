@@ -10,13 +10,12 @@ const storageKey = (id: string) => `geo-lead:${id}`;
  * The email a visitor must give to open a finished report. While the analysis runs it is offered early ("running"), so
  * they can leave and get the result by email; on a finished report it is the only way in ("locked").
  */
-export function EmailReportForm({ analysisId, brand, variant, onDone }: { analysisId: string; brand: string; variant: "running" | "locked"; onDone?: () => void }) {
+export function EmailReportForm({ analysisId, brand, variant }: { analysisId: string; brand: string; variant: "running" | "locked" }) {
   const locked = variant === "locked";
   const [email, setEmail] = useState("");
   const [marketing, setMarketing] = useState(false);
   // Only rendered after the report loads in the browser, so reading storage here never mismatches the server HTML.
   const [sentTo, setSentTo] = useState<string | null>(() => {
-    if (locked) return null; // the server decides: a remembered address doesn't open a report without its cookie
     try {
       return localStorage.getItem(storageKey(analysisId));
     } catch {
@@ -43,7 +42,6 @@ export function EmailReportForm({ analysisId, brand, variant, onDone }: { analys
       try {
         localStorage.setItem(storageKey(analysisId), saved);
       } catch {}
-      onDone?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "We couldn't save your email. Try again.");
     } finally {
@@ -57,15 +55,16 @@ export function EmailReportForm({ analysisId, brand, variant, onDone }: { analys
         <span className="mt-0.5 inline-flex size-[22px] shrink-0 items-center justify-center rounded-full bg-blue-50">
           <Check className="size-3.5 text-blue-700" strokeWidth={3} aria-hidden />
         </span>
-        <p className="text-[15px] leading-normal">
-          {locked ? (
-            <>Opening your report…</>
-          ) : (
-            <>
-              Done. Your report opens here when it&apos;s ready, and we&apos;ll email it to <strong className="break-all">{sentTo}</strong>. You can close this page.
-            </>
-          )}
-        </p>
+        <div className="text-[15px] leading-normal">
+          <p className="font-semibold">Check your inbox</p>
+          <p className="mt-1 text-muted-foreground">
+            {locked ? "We sent" : "When the report is ready we'll send"} a link to <strong className="break-all text-foreground">{sentTo}</strong>. Open it to see the full report: it
+            confirms the email is yours. Not there? Look in spam.
+          </p>
+          <button type="button" onClick={() => setSentTo(null)} className="mt-2 text-sm text-foreground underline underline-offset-2">
+            {locked ? "Resend or use a different email" : "Use a different email"}
+          </button>
+        </div>
       </section>
     );
   }
@@ -73,12 +72,12 @@ export function EmailReportForm({ analysisId, brand, variant, onDone }: { analys
   return (
     <section className="mt-6 rounded-2xl border border-brand/20 bg-brand-soft p-5 sm:p-7">
       <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-        <Mail className="size-5 text-brand" aria-hidden /> {locked ? "Enter your email to see the report" : "Where should we send your report?"}
+        <Mail className="size-5 text-brand" aria-hidden /> {locked ? "Get the full report by email" : "Where should we send your report?"}
       </h2>
       <p className="mt-1 text-sm leading-normal text-muted-foreground">
         {locked
-          ? `Who AI recommends instead of ${brand}, the results model by model, and your action plan. We'll also email you a copy.`
-          : `You'll need your email to open the results. Leave it now and we'll also send the report when it's ready, so you don't have to wait here.`}
+          ? `Who AI recommends instead of ${brand}, the results model by model, every question we asked and your full action plan. We'll email you a link to open it.`
+          : `The full report opens from a link we email you. Leave your email now and we'll send it when it's ready, so you don't have to wait here.`}
       </p>
       <form onSubmit={submit} className="mt-4">
         <div className="flex flex-col gap-2.5 sm:flex-row">
@@ -101,7 +100,7 @@ export function EmailReportForm({ analysisId, brand, variant, onDone }: { analys
             disabled={busy}
             className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand px-5 font-semibold text-brand-foreground hover:bg-brand/90 disabled:opacity-60"
           >
-            {busy ? "Saving…" : locked ? "See my report" : "Send me the report"} {!busy && <ArrowRight className="size-4" aria-hidden />}
+            {busy ? "Sending…" : "Send me the report"} {!busy && <ArrowRight className="size-4" aria-hidden />}
           </button>
         </div>
         <label className="mt-3 flex items-start gap-2.5 text-sm text-muted-foreground">

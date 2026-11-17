@@ -8,12 +8,12 @@ import { UrlForm } from "@/components/url-form";
 import { TrackCta, type Viewer } from "@/components/track-cta";
 import { EmailReportForm } from "@/components/email-report-form";
 import { REPORT_REUSE_HOURS } from "@/lib/reuse";
-import type { ReportTeaser } from "@/lib/teaser";
+import { reportSummary, type ReportSummary } from "@/lib/teaser";
 import { cn } from "@/lib/utils";
 
 type Result = NonNullable<Report["result"]>;
 /** The API hides a finished report's results until the visitor gives an email (see api/analyses/[id]). */
-type ApiReport = Report & { locked?: boolean; teaser?: ReportTeaser };
+type ApiReport = Report & { locked?: boolean; summary?: ReportSummary };
 
 /** Pipeline stages with the progress value each one starts at (see lib/pipeline/run.ts). */
 const STEPS: [string, number][] = [
@@ -35,7 +35,6 @@ function scoreTone(score: number) {
 export function ReportView({ id, turnstileSiteKey, viewer }: { id: string; turnstileSiteKey: string | null; viewer: Viewer }) {
   const [report, setReport] = useState<ApiReport | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
@@ -57,7 +56,7 @@ export function ReportView({ id, turnstileSiteKey, viewer }: { id: string; turns
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [id, reloadKey]);
+  }, [id]);
 
   if (notFound) return <Shell><p className="text-muted-foreground">This report doesn&apos;t exist.</p></Shell>;
   if (!report) return <Shell><p className="text-muted-foreground">Loading…</p></Shell>;
@@ -72,7 +71,7 @@ export function ReportView({ id, turnstileSiteKey, viewer }: { id: string; turns
       </Shell>
     );
   }
-  if (report.locked) return <Locked report={report} onUnlocked={() => setReloadKey((k) => k + 1)} />;
+  if (report.locked) return <Locked report={report} />;
   if (!report.result) return <Running report={report} />;
   return <Completed report={report} result={report.result} viewer={viewer} />;
 }
@@ -170,35 +169,92 @@ function Running({ report }: { report: Report }) {
   );
 }
 
-function Locked({ report, onUnlocked }: { report: ApiReport; onUnlocked: () => void }) {
+function Locked({ report }: { report: ApiReport }) {
   const brand = report.profile?.brand ?? report.domain;
-  const t = report.teaser;
+  const form = <EmailReportForm analysisId={report.id} brand={brand} variant="locked" />;
+  if (!report.summary) {
+    return (
+      <Shell>
+        <p className="font-mono text-xs text-muted-foreground">{report.domain}</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Your AI visibility report for {brand} is ready</h1>
+        {form}
+      </Shell>
+    );
+  }
   return (
-    <Shell>
-      <p className="font-mono text-xs text-muted-foreground">{report.domain}</p>
-      <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Your AI visibility report for {brand} is ready</h1>
-      {t ? (
-        <section className="mt-6 flex flex-col items-start gap-6 rounded-2xl border bg-background p-5 sm:flex-row sm:items-center sm:gap-8 sm:p-7">
-          <ScoreRing score={t.geoScore} />
-          <div className="flex flex-col gap-2.5">
-            <span className={cn("self-start rounded-md px-2.5 py-1 text-[13px] font-semibold", scoreTone(t.geoScore).chip)}>{scoreTone(t.geoScore).label}</span>
-            <p className="text-balance text-xl font-semibold leading-snug tracking-tight">{teaserHook(brand, t)}</p>
-            <p className="text-sm text-muted-foreground">Who they recommend instead, model by model, and your action plan are in the full report.</p>
-          </div>
-        </section>
-      ) : (
-        <p className="mt-2 text-muted-foreground">We asked AI models the questions your buyers ask. Enter your email to open the results.</p>
-      )}
-      <EmailReportForm analysisId={report.id} brand={brand} variant="locked" onDone={onUnlocked} />
-    </Shell>
+    <div className="flex-1 bg-surface">
+      <section className="border-b bg-background pb-10 pt-10">
+        <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 sm:px-8">
+          <Summary report={report} s={report.summary} planHref="#unlock" />
+        </div>
+      </section>
+      <div id="unlock" className="mx-auto max-w-3xl scroll-mt-6 px-4 pb-16 sm:px-8">
+        {form}
+      </div>
+    </div>
   );
 }
 
-/** The one line a locked report gives away: how often AI names the brand and how many rivals it names more. */
-function teaserHook(brand: string, t: ReportTeaser): string {
-  const named = `AI assistants named ${brand} in ${t.mentioned} of ${t.responses} answers`;
-  if (t.aheadCount === 0) return t.mentioned ? `${named}, more often than any competitor.` : `${named}.`;
-  return `${named}. ${t.aheadCount} competitor${t.aheadCount === 1 ? " was" : "s were"} named more often.`;
+/** The top of a report (score, headline, KPIs, fix #1): the whole report shows it, and a locked one shows only this. */
+function Summary({ report, s, planHref, history }: { report: Report; s: ReportSummary; planHref: string; history?: React.ReactNode }) {
+  const tone = scoreTone(s.geoScore);
+  const brand = report.profile?.brand ?? report.domain;
+  const pct = (n: number) => (s.responses ? Math.round((n / s.responses) * 100) : 0);
+  const date = new Date(report.createdAt).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric" });
+  return (
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="font-mono text-xs text-muted-foreground">
+          {[report.domain, report.profile?.industry, report.profile?.country, date].filter(Boolean).join(" · ")}
+        </p>
+        <CopyLinkButton />
+      </div>
+      <FreshnessNote createdAt={report.createdAt} />
+
+      <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:gap-10">
+        <ScoreRing score={s.geoScore} />
+        <div className="flex flex-col gap-3">
+          <span className={cn("self-start rounded-md px-2.5 py-1 text-[13px] font-semibold", tone.chip)}>{tone.label}</span>
+          <h1 className="text-balance text-3xl font-semibold leading-tight tracking-[-0.03em] sm:text-[38px]">
+            AI assistants {tone.verb} {brand}
+          </h1>
+          <p className="max-w-2xl text-[17px] leading-normal text-muted-foreground">
+            Mentioned in{" "}
+            <strong className="text-foreground">
+              {s.mentioned} of {s.responses}
+            </strong>{" "}
+            answers to buyer questions.
+            {s.leader && (
+              <>
+                {" "}
+                <strong className="text-foreground">{s.leader.name}</strong> appeared in {s.leader.mentions}.
+              </>
+            )}
+          </p>
+          {history}
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Kpi label="Mentioned" value={`${pct(s.mentioned)}%`} hint="of answers name you" />
+        <Kpi label="Recommended" value={`${pct(s.recommended)}%`} hint="of answers suggest you" />
+        <Kpi label="Average position" value={s.avgPosition ? `#${s.avgPosition.toFixed(1)}` : "–"} hint={s.avgPosition ? "when you are listed" : "never listed"} />
+      </div>
+
+      {s.topFix && (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-foreground px-5 py-4 text-background">
+          <div className="flex min-w-0 flex-[1_1_420px] items-start gap-3.5">
+            <span className="shrink-0 rounded-md bg-brand px-2 py-1 font-mono text-[11px] tracking-[0.06em] text-brand-foreground">FIX #1</span>
+            <p className="text-[15px] leading-normal">{s.topFix}</p>
+          </div>
+          <a href={planHref} className="inline-flex items-center gap-1.5 text-sm font-medium text-background hover:underline">
+            See the full plan
+            <ArrowRight className="size-4" aria-hidden />
+          </a>
+        </div>
+      )}
+    </>
+  );
 }
 
 function ScoreRing({ score }: { score: number }) {
@@ -220,19 +276,11 @@ function ScoreRing({ score }: { score: number }) {
 }
 
 function Completed({ report, result, viewer }: { report: Report; result: Result; viewer: Viewer }) {
-  const tone = scoreTone(result.geoScore);
-  const t = result.breakdown.totals;
   const brand = report.profile?.brand ?? report.domain;
-  const me = result.competitors.find((c) => c.isTarget);
-  const leader = result.competitors.find((c) => !c.isTarget);
   const providerNames = Object.fromEntries(result.providers.map((p) => [p.id, p.name]));
   const tested = result.providers.filter((p) => p.tested);
   const paidOnly = result.providers.filter((p) => !p.tested && p.paidOnly);
   const untested = result.providers.filter((p) => !p.tested && !p.paidOnly);
-  const positions = result.queries.flatMap((q) => q.results.map((r) => r.position)).filter((p): p is number => p !== null);
-  const avgPosition = positions.length ? positions.reduce((a, b) => a + b, 0) / positions.length : null;
-  const pct = (n: number) => (t.responses ? Math.round((n / t.responses) * 100) : 0);
-  const topFix = result.recommendations[0];
   const date = new Date(report.createdAt).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric" });
 
   return (
@@ -240,62 +288,20 @@ function Completed({ report, result, viewer }: { report: Report; result: Result;
       {/* SUMMARY */}
       <section className="border-b bg-background pt-10">
         <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 sm:px-8">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="font-mono text-xs text-muted-foreground">
-              {[report.domain, report.profile?.industry, report.profile?.country, date].filter(Boolean).join(" · ")}
-            </p>
-            <CopyLinkButton />
-          </div>
-          <FreshnessNote createdAt={report.createdAt} />
-
-          <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:gap-10">
-            <ScoreRing score={result.geoScore} />
-            <div className="flex flex-col gap-3">
-              <span className={cn("self-start rounded-md px-2.5 py-1 text-[13px] font-semibold", tone.chip)}>{tone.label}</span>
-              <h1 className="text-balance text-3xl font-semibold leading-tight tracking-[-0.03em] sm:text-[38px]">
-                AI assistants {tone.verb} {brand}
-              </h1>
-              <p className="max-w-2xl text-[17px] leading-normal text-muted-foreground">
-                Mentioned in{" "}
-                <strong className="text-foreground">
-                  {t.mentioned} of {t.responses}
-                </strong>{" "}
-                answers to buyer questions.
-                {leader && leader.mentions > (me?.mentions ?? 0) && (
-                  <>
-                    {" "}
-                    <strong className="text-foreground">{leader.name}</strong> appeared in {leader.mentions}.
-                  </>
-                )}
-              </p>
-              {result.history.length > 1 && (
+          <Summary
+            report={report}
+            s={reportSummary(result)}
+            planHref="#plan"
+            history={
+              result.history.length > 1 && (
                 <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
                   <RotateCcw className="size-3.5" aria-hidden />
                   History <span className="font-mono text-foreground">{result.history.map((h) => h.score).join(" → ")}</span>
                   {result.promptsReused && " · same questions each run"}
                 </p>
-              )}
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Kpi label="Mentioned" value={`${pct(t.mentioned)}%`} hint="of answers name you" />
-            <Kpi label="Recommended" value={`${pct(t.recommended)}%`} hint="of answers suggest you" />
-            <Kpi label="Average position" value={avgPosition ? `#${avgPosition.toFixed(1)}` : "–"} hint={avgPosition ? "when you are listed" : "never listed"} />
-          </div>
-
-          {topFix && (
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-foreground px-5 py-4 text-background">
-              <div className="flex min-w-0 flex-[1_1_420px] items-start gap-3.5">
-                <span className="shrink-0 rounded-md bg-brand px-2 py-1 font-mono text-[11px] tracking-[0.06em] text-brand-foreground">FIX #1</span>
-                <p className="text-[15px] leading-normal">{topFix.title}</p>
-              </div>
-              <a href="#plan" className="inline-flex items-center gap-1.5 text-sm font-medium text-background hover:underline">
-                See the full plan
-                <ArrowRight className="size-4" aria-hidden />
-              </a>
-            </div>
-          )}
+              )
+            }
+          />
 
           <nav aria-label="Report sections" className="-mx-1 flex gap-1.5 overflow-x-auto border-t py-2.5">
             {[

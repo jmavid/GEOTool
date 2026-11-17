@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { getReport } from "@/lib/analyses";
 import { currentUser } from "@/lib/auth/session";
 import { LEAD_COOKIE, notifyLeads, reportAccess } from "@/lib/leads";
-import { reportTeaser } from "@/lib/teaser";
+import { reportSummary } from "@/lib/teaser";
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
@@ -15,8 +15,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 
   // A finished report only opens for signed-in users and visitors who gave their email.
   const access = await reportAccess(id, { signedIn: !!(await currentUser()), token: (await cookies()).get(LEAD_COOKIE)?.value });
-  // Before the email only the score and one hook go out (see lib/teaser), never the full results.
-  if (!access.allowed) return NextResponse.json({ ...report, result: null, locked: true, teaser: reportTeaser(report.result) }, { headers });
+  // Before the email is verified only the summary goes out (see lib/teaser), never the full results.
+  if (!access.allowed) return NextResponse.json({ ...report, result: null, locked: true, summary: reportSummary(report.result) }, { headers });
   if (access.added) after(() => notifyLeads(id));
   return NextResponse.json({ ...report, locked: false }, { headers });
 }
